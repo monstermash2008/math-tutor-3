@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Math Tutor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.1/math.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .feedback-card { transition: all 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-2xl mx-auto p-4 sm:p-8 bg-white rounded-2xl shadow-lg border border-gray-200">
+        
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Interactive Math Tutor</h1>
+            <p class="text-gray-500 mt-2">Solve the problem one step at a time.</p>
+        </div>
+
+        <!-- Problem Display -->
+        <div class="bg-gray-100 p-6 rounded-xl mb-6 border border-gray-200">
+            <p class="text-sm font-semibold text-blue-600 mb-2">Problem:</p>
+            <p id="problem-statement" class="text-xl font-medium text-gray-800"></p>
+        </div>
+
+        <!-- Step-by-Step Solution Display -->
+        <div id="solution-steps" class="space-y-3 mb-6">
+            <!-- Steps will be dynamically inserted here -->
+        </div>
+
+        <!-- User Input Area -->
+        <div class="mt-4">
+            <label for="student-answer" id="step-label" class="block text-sm font-medium text-gray-700 mb-2">Your next step:</label>
+            <div class="flex items-center space-x-3">
+                <input type="text" id="student-answer" class="flex-grow w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200" placeholder="e.g., 4x - 12 - x + 5 = 14">
+                <button id="check-answer-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200">
+                    Check
+                </button>
+            </div>
+        </div>
+
+        <!-- LLM Feedback Area -->
+        <div id="feedback-container" class="mt-6">
+             <!-- Feedback card will be dynamically inserted here -->
+        </div>
+
+    </div>
+
+    <script type="module">
+        // --- DOM ELEMENT REFERENCES ---
+        const problemStatementEl = document.getElementById('problem-statement');
+        const solutionStepsEl = document.getElementById('solution-steps');
+        const studentAnswerEl = document.getElementById('student-answer');
+        const checkAnswerBtn = document.getElementById('check-answer-btn');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const stepLabel = document.getElementById('step-label');
+
+        // --- PROBLEM OBJECT MODEL (as per PRD 2.0) ---
+        const problem = {
+            problemId: "p-102",
+            problemStatement: "Solve for x: 4(x - 3) - (x - 5) = 14",
+            problemType: "SOLVE_EQUATION",
+            teacherModel: {
+                type: "sequential_steps",
+                steps: [
+                    "4x - 12 - (x - 5) = 14",
+                    "4x - 12 - x + 5 = 14",
+                    "3x - 12 + 5 = 14",
+                    "3x - 7 = 14",
+                    "3x = 21",
+                    "x = 7"
+                ]
+            },
+            feedbackConfig: {
+                tone: "encouraging",
+                verbosity: "medium"
+            }
+        };
+
+        // --- APPLICATION STATE ---
+        let userHistory = [problem.problemStatement];
+
+        // --- INITIALIZATION ---
+        function initializeProblem() {
+            problemStatementEl.textContent = problem.problemStatement;
+            renderSolutionSteps();
+        }
+
+        function renderSolutionSteps() {
+            solutionStepsEl.innerHTML = userHistory.slice(1).map((step, index) => `
+                <div class="flex items-center bg-green-50 p-4 rounded-lg border border-green-200">
+                    <svg class="w-6 h-6 text-green-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <div>
+                        <p class="text-sm text-gray-500">Step ${index + 1}</p>
+                        <p class="text-gray-800 font-medium">${step}</p>
+                    </div>
+                </div>
+            `).join('');
+            
+            if (isProblemSolved()) {
+                stepLabel.textContent = "Problem Solved!";
+                studentAnswerEl.disabled = true;
+                checkAnswerBtn.disabled = true;
+                checkAnswerBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+            } else {
+                 stepLabel.textContent = `Step ${userHistory.length}:`;
+            }
+        }
+
+        // --- HELPER FUNCTIONS FOR EQUATION HANDLING ---
+        const getCanonical = (str) => {
+            if (str.includes('=')) {
+                const sides = str.split('=');
+                if (sides.length !== 2 || !sides[0] || !sides[1]) {
+                    throw new Error("Invalid equation format.");
+                }
+                const node = math.parse(`(${sides[0]}) - (${sides[1]})`);
+                return math.simplify(node);
+            }
+            return math.simplify(str);
+        };
+
+        const isFullySimplified = (inputStr) => {
+            try {
+                if (inputStr.includes('=')) {
+                    const sides = inputStr.split('=');
+                    const rhs = sides[1].trim();
+                    const rhsNode = math.parse(rhs);
+                    return rhsNode.toString({ implicit: 'hide' }) === math.simplify(rhsNode).toString({ implicit: 'hide' });
+                }
+                const node = math.parse(inputStr);
+                return node.toString({ implicit: 'hide' }) === math.simplify(node).toString({ implicit: 'hide' });
+            } catch {
+                return false;
+            }
+        }
+
+        function isProblemSolved() {
+            if (userHistory.length === 0) return false;
+            const lastUserStep = userHistory[userHistory.length - 1];
+            const finalTeacherStep = problem.teacherModel.steps[problem.teacherModel.steps.length - 1];
+            try {
+                 const userCanonical = getCanonical(lastUserStep);
+                 const teacherCanonical = getCanonical(finalTeacherStep);
+                 return userCanonical.equals(teacherCanonical) && isFullySimplified(lastUserStep);
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        // --- VALIDATION ENGINE ---
+        function checkAnswer() {
+            const studentInput = studentAnswerEl.value.trim();
+            if (!studentInput) return;
+
+            const previousStep = userHistory[userHistory.length - 1];
+            let validationResult, feedbackContext;
+
+            try {
+                const studentCanonical = getCanonical(studentInput);
+                const finalTeacherCanonical = getCanonical(problem.teacherModel.steps[problem.teacherModel.steps.length - 1]);
+                
+                const isCorrectStep = problem.teacherModel.steps.some(teacherStep => {
+                    return studentCanonical.equals(getCanonical(teacherStep));
+                });
+                const isFinalStepEquivalent = studentCanonical.equals(finalTeacherCanonical);
+
+                if (isCorrectStep) {
+                    if (isFinalStepEquivalent) {
+                        if (isFullySimplified(studentInput)) {
+                            validationResult = "CORRECT_FINAL_STEP";
+                        } else {
+                            validationResult = "CORRECT_BUT_NOT_SIMPLIFIED";
+                        }
+                    } else {
+                        validationResult = "CORRECT_INTERMEDIATE_STEP";
+                    }
+                    userHistory.push(studentInput);
+                    studentAnswerEl.value = '';
+                    renderSolutionSteps();
+                } else {
+                    const previousCanonical = getCanonical(previousStep);
+                    if(studentCanonical.equals(previousCanonical)) {
+                         validationResult = "VALID_BUT_NO_PROGRESS";
+                    } else {
+                         validationResult = "EQUIVALENCE_FAILURE";
+                    }
+                }
+                
+                feedbackContext = {
+                    studentInput,
+                    previousStep,
+                    validationResult,
+                    expectedNextSteps: problem.teacherModel.steps.slice(userHistory.length -1),
+                };
+
+            } catch (error) {
+                console.error("Parsing error:", error);
+                validationResult = "PARSING_ERROR";
+                feedbackContext = { studentInput, validationResult, errorMessage: error.message };
+            }
+
+            getLLMFeedback(feedbackContext);
+        }
+
+        // --- LLM FEEDBACK SERVICE ---
+        async function getLLMFeedback(context) {
+            displayLoadingFeedback();
+            const prompt = constructPrompt(context);
+            console.log("Generated Prompt for LLM:", prompt);
+
+            // --- SIMULATION ---
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            const feedbackText = simulateLLMResponse(context);
+            // --- END SIMULATION ---
+
+            displayFeedback(feedbackText, context.validationResult);
+        }
+        
+        function constructPrompt(context) {
+            const basePrompt = `You are a helpful and ${problem.feedbackConfig.tone} high school math tutor. A 9th-grade student is working on a problem.
+            
+            Problem: "${problem.problemStatement}"
+            Problem Type: "${problem.problemType}"
+            Student's Full History: ${JSON.stringify(userHistory)}
+            Student's Last Correct Step: "${context.previousStep}"
+            Student's Current Input: "${context.studentInput}"
+            Validation Result Code: "${context.validationResult}"`;
+
+            switch(context.validationResult) {
+                case "CORRECT_INTERMEDIATE_STEP":
+                    return `${basePrompt}\n\nThe student's step is correct. Provide brief, encouraging feedback and guide them toward the next logical step. The remaining steps are: ${JSON.stringify(context.expectedNextSteps)}.`;
+                case "CORRECT_FINAL_STEP":
+                     return `${basePrompt}\n\nThe student has correctly solved the problem. Provide positive, conclusive feedback congratulating them.`;
+                case "CORRECT_BUT_NOT_SIMPLIFIED":
+                    return `${basePrompt}\n\nThe student's answer is mathematically correct, but not fully simplified. Encourage them to perform the final simplification step (e.g., '21/3' should be '7').`;
+                case "VALID_BUT_NO_PROGRESS":
+                    return `${basePrompt}\n\nThe student's answer is mathematically equivalent to the previous step, but doesn't move closer to the solution. Gently point this out and encourage them to perform an operation that simplifies the equation or isolates the variable 'x'.`;
+                case "EQUIVALENCE_FAILURE":
+                    return `${basePrompt}\n\nThe student's answer is not mathematically equivalent to the previous step. Analyze the student's input compared to their last correct step. Identify the likely error and guide them to rethink their approach without giving away the direct answer.`;
+                case "PARSING_ERROR":
+                     return `${basePrompt}\n\nThe student's input could not be understood as a mathematical expression. The error was: "${context.errorMessage}". Gently tell the student that their answer wasn't formatted correctly and suggest they check for typos.`;
+                default:
+                    return `${basePrompt}\n\nSomething unexpected happened. Provide general encouragement.`;
+            }
+        }
+        
+        function simulateLLMResponse(context) {
+            switch(context.validationResult) {
+                case "CORRECT_INTERMEDIATE_STEP":
+                    return "Excellent work! That's a perfect next step. What would you do now to combine the like terms?";
+                case "CORRECT_FINAL_STEP":
+                     return "Fantastic! You've solved it. Great job working through all the steps to find the correct answer!";
+                case "CORRECT_BUT_NOT_SIMPLIFIED":
+                    return "You are so close! The value is correct, but it needs to be simplified. What is the final value?";
+                case "VALID_BUT_NO_PROGRESS":
+                    return "That's a valid rearrangement, but it doesn't simplify the equation further. Try performing an operation on both sides that helps you combine the like terms or isolate the variable."
+                case "EQUIVALENCE_FAILURE":
+                    if (context.studentInput.includes('- 5')) {
+                         return "Great job distributing the first part! Be very careful when you see a minus sign in front of parentheses like `-(x - 5)`. It means you need to distribute a `-1` to *every* term inside. What does that second part of the expression become?";
+                    }
+                    return "Hmm, that doesn't look quite right. Let's take another look at your last correct step. Make sure you're applying operations correctly to keep everything balanced.";
+                case "PARSING_ERROR":
+                     return `I wasn't able to understand that. Could you please check the format of your answer? The system reported an error: "${context.errorMessage}" Make sure to use standard math symbols like \`*\` for multiplication.`;
+                default:
+                    return "You've got this! Let's try that step again.";
+            }
+        }
+
+        // --- UI FEEDBACK DISPLAY ---
+        function displayLoadingFeedback() {
+             feedbackContainer.innerHTML = `
+                <div class="feedback-card bg-white p-4 rounded-lg border border-gray-200 shadow-sm animate-pulse">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-gray-200 rounded-full mr-3"></div>
+                        <div class="flex-grow">
+                            <div class="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+                            <div class="h-4 bg-gray-200 rounded w-full"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function displayFeedback(text, status) {
+            let bgColor, textColor, iconSvg;
+            switch(status) {
+                case "CORRECT_FINAL_STEP":
+                case "CORRECT_INTERMEDIATE_STEP":
+                    bgColor = 'bg-green-50 border-green-200';
+                    textColor = 'text-green-800';
+                    iconSvg = `<svg class="w-8 h-8 text-green-500 mr-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`;
+                    break;
+                case "EQUIVALENCE_FAILURE":
+                case "PARSING_ERROR":
+                case "VALID_BUT_NO_PROGRESS":
+                case "CORRECT_BUT_NOT_SIMPLIFIED":
+                default:
+                    bgColor = 'bg-yellow-50 border-yellow-200';
+                    textColor = 'text-yellow-800';
+                    iconSvg = `<svg class="w-8 h-8 text-yellow-500 mr-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>`;
+                    break;
+            }
+            
+            feedbackContainer.innerHTML = `
+                <div class="feedback-card ${bgColor} p-5 rounded-lg border flex items-start shadow-sm">
+                    ${iconSvg}
+                    <div>
+                        <h4 class="font-bold ${textColor}">Tutor Feedback</h4>
+                        <p class="mt-1 text-gray-700">${text}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // --- EVENT LISTENERS ---
+        checkAnswerBtn.addEventListener('click', checkAnswer);
+        studentAnswerEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        // --- START THE APPLICATION ---
+        initializeProblem();
+    </script>
+
+</body>
+</html>
