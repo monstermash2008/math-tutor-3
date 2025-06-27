@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Do not resort to hacks like Regular expressions to compare mathematical expressions or equations. This should be handled by our CAS.
