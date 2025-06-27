@@ -1,39 +1,33 @@
 import { createFileRoute } from '@tanstack/react-router'
-import logo from '../logo.svg'
+import { MathTutorApp } from '../components/MathTutorApp'
+import type { ProblemModel } from '../lib/validation-engine'
 
 export const Route = createFileRoute('/')({
   component: App,
 })
 
+// Sample problem for Phase 2 testing
+const sampleProblem: ProblemModel = {
+  problemId: 'p-102',
+  problemStatement: 'Solve for x: 4(x - 3) - (x - 5) = 14',
+  problemType: 'SOLVE_EQUATION',
+  teacherModel: {
+    type: 'sequential_steps',
+    steps: [
+      '4x - 12 - (x - 5) = 14',
+      '4x - 12 - x + 5 = 14',
+      '3x - 12 + 5 = 14',
+      '3x - 7 = 14',
+      '3x = 21',
+      'x = 7'
+    ]
+  }
+};
+
 function App() {
   return (
-    <div className="text-center">
-      <header className="min-h-screen flex flex-col items-center justify-center bg-[#282c34] text-white text-[calc(10px+2vmin)]">
-        <img
-          src={logo}
-          className="h-[40vmin] pointer-events-none animate-[spin_20s_linear_infinite]"
-          alt="logo"
-        />
-        <p>
-          Edit <code>src/routes/index.tsx</code> and save to reload.
-        </p>
-        <a
-          className="text-[#61dafb] hover:underline"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-        <a
-          className="text-[#61dafb] hover:underline"
-          href="https://tanstack.com"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn TanStack
-        </a>
-      </header>
+    <div className="min-h-screen bg-gray-50 text-gray-800 flex items-center justify-center py-8">
+      <MathTutorApp problem={sampleProblem} />
     </div>
   )
 }
