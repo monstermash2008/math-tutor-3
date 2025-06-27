@@ -1,8 +1,33 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import type { StudentAttempt } from '../MathTutorApp';
 import { StepsHistory } from '../StepsHistory';
 
 describe('StepsHistory Component', () => {
+  const mockAttempts: StudentAttempt[] = [
+    {
+      input: '4x - 12 - x + 5 = 14',
+      isCorrect: true,
+      feedback: 'Great job!',
+      timestamp: new Date('2024-01-01T10:00:00'),
+      stepNumber: 1
+    },
+    {
+      input: '4x - 12 - x - 5 = 14',
+      isCorrect: false,
+      feedback: 'Check your arithmetic',
+      timestamp: new Date('2024-01-01T09:55:00'),
+      stepNumber: 1
+    },
+    {
+      input: '3x - 7 = 14',
+      isCorrect: true,
+      feedback: 'Correct!',
+      timestamp: new Date('2024-01-01T10:05:00'),
+      stepNumber: 2
+    }
+  ];
+
   it('should render a list of steps when history is provided', () => {
     const history = [
       'Solve for x: 4(x - 3) - (x - 5) = 14',
@@ -10,7 +35,7 @@ describe('StepsHistory Component', () => {
       '3x - 7 = 14'
     ];
 
-    render(<StepsHistory history={history} />);
+    render(<StepsHistory history={history} allAttempts={[]} />);
 
     // Should render 2 steps (excluding the problem statement)
     expect(screen.getByText('Step 1')).toBeInTheDocument();
@@ -20,13 +45,13 @@ describe('StepsHistory Component', () => {
   });
 
   it('should render nothing for an empty history array', () => {
-    const { container } = render(<StepsHistory history={[]} />);
+    const { container } = render(<StepsHistory history={[]} allAttempts={[]} />);
     expect(container.firstChild).toBeNull();
   });
 
   it('should render nothing when history only contains problem statement', () => {
     const history = ['Solve for x: 4(x - 3) - (x - 5) = 14'];
-    const { container } = render(<StepsHistory history={history} />);
+    const { container } = render(<StepsHistory history={history} allAttempts={[]} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -36,7 +61,7 @@ describe('StepsHistory Component', () => {
       '4x - 12 - x + 5 = 14'
     ];
 
-    render(<StepsHistory history={history} />);
+    render(<StepsHistory history={history} allAttempts={[]} />);
 
     // Check for step styling - get the parent div that has the bg-green-50 class
     const stepElement = screen.getByText('4x - 12 - x + 5 = 14');
@@ -58,7 +83,7 @@ describe('StepsHistory Component', () => {
       'x = 7'
     ];
 
-    render(<StepsHistory history={history} isSolved={true} />);
+    render(<StepsHistory history={history} allAttempts={[]} isSolved={true} />);
 
     // Check for final answer special styling
     expect(screen.getByText('Final Answer')).toBeInTheDocument();
@@ -88,7 +113,7 @@ describe('StepsHistory Component', () => {
       '3x - 7 = 14'
     ];
 
-    render(<StepsHistory history={history} isSolved={false} />);
+    render(<StepsHistory history={history} allAttempts={[]} isSolved={false} />);
 
     // Should not show "Final Answer" label
     expect(screen.queryByText('Final Answer')).not.toBeInTheDocument();
@@ -99,5 +124,93 @@ describe('StepsHistory Component', () => {
     expect(allSteps).toHaveLength(2);
     expect(screen.getByText('Step 1')).toBeInTheDocument();
     expect(screen.getByText('Step 2')).toBeInTheDocument();
+  });
+
+  it('renders nothing when no history or attempts', () => {
+    const { container } = render(<StepsHistory history={['Problem statement']} allAttempts={[]} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('displays correct steps with green styling', () => {
+    render(<StepsHistory history={['Problem', '4x - 12 - x + 5 = 14', '3x - 7 = 14']} allAttempts={mockAttempts} />);
+    
+    expect(screen.getByText('Step 1')).toBeInTheDocument();
+    expect(screen.getByText('Step 2')).toBeInTheDocument();
+    expect(screen.getByText('4x - 12 - x + 5 = 14')).toBeInTheDocument();
+    expect(screen.getByText('3x - 7 = 14')).toBeInTheDocument();
+  });
+
+  it('displays incorrect attempts with red styling', () => {
+    render(<StepsHistory history={['Problem', '4x - 12 - x + 5 = 14']} allAttempts={mockAttempts} />);
+    
+    expect(screen.getByText('Incorrect Attempt')).toBeInTheDocument();
+    expect(screen.getByText('4x - 12 - x - 5 = 14')).toBeInTheDocument();
+    expect(screen.getByText('Check your arithmetic')).toBeInTheDocument();
+  });
+
+  it('shows final answer with special styling when solved', () => {
+    render(<StepsHistory history={['Problem', 'x = 7']} allAttempts={mockAttempts} isSolved={true} />);
+    
+    expect(screen.getByText('Final Answer')).toBeInTheDocument();
+    expect(screen.getByText('🎉 Excellent work!')).toBeInTheDocument();
+  });
+
+  it('displays timestamps for attempts', () => {
+    render(<StepsHistory history={['Problem', '4x - 12 - x + 5 = 14']} allAttempts={mockAttempts} />);
+    
+    // Check that timestamp is displayed (format may vary by locale)
+    const timeElements = screen.getAllByText(/\d{1,2}:\d{2}:\d{2}/);
+    expect(timeElements.length).toBeGreaterThan(0);
+  });
+
+  it('groups attempts by step number correctly', () => {
+    const multiStepAttempts: StudentAttempt[] = [
+      {
+        input: 'wrong1',
+        isCorrect: false,
+        feedback: 'Try again',
+        timestamp: new Date(),
+        stepNumber: 1
+      },
+      {
+        input: 'wrong2',
+        isCorrect: false,
+        feedback: 'Still wrong',
+        timestamp: new Date(),
+        stepNumber: 1
+      },
+      {
+        input: 'correct1',
+        isCorrect: true,
+        feedback: 'Good job',
+        timestamp: new Date(),
+        stepNumber: 1
+      }
+    ];
+
+    render(<StepsHistory history={['Problem', 'correct1']} allAttempts={multiStepAttempts} />);
+    
+    expect(screen.getAllByText('Incorrect Attempt')).toHaveLength(2);
+    expect(screen.getByText('wrong1')).toBeInTheDocument();
+    expect(screen.getByText('wrong2')).toBeInTheDocument();
+    expect(screen.getByText('correct1')).toBeInTheDocument();
+  });
+
+  it('shows current step incorrect attempts when not solved', () => {
+    const currentStepAttempts: StudentAttempt[] = [
+      {
+        input: 'wrong attempt',
+        isCorrect: false,
+        feedback: 'Not quite right',
+        timestamp: new Date(),
+        stepNumber: 2 // Next step after completed step 1
+      }
+    ];
+
+    render(<StepsHistory history={['Problem', '4x - 12 - x + 5 = 14']} allAttempts={currentStepAttempts} isSolved={false} />);
+    
+    expect(screen.getByText('Previous attempts for Step 2:')).toBeInTheDocument();
+    expect(screen.getByText('wrong attempt')).toBeInTheDocument();
+    expect(screen.getByText('Not quite right')).toBeInTheDocument();
   });
 }); 

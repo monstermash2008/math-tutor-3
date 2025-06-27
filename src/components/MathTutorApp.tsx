@@ -6,9 +6,19 @@ import { ProblemView } from './ProblemView';
 import { StepsHistory } from './StepsHistory';
 import { UserInput } from './UserInput';
 
+// Individual attempt interface
+interface StudentAttempt {
+  input: string;
+  isCorrect: boolean;
+  feedback: string;
+  timestamp: Date;
+  stepNumber: number;
+}
+
 // Application state interface
 interface AppState {
-  userHistory: string[];
+  userHistory: string[]; // Only correct steps
+  allAttempts: StudentAttempt[]; // All attempts (correct and incorrect)
   currentStatus: 'idle' | 'checking' | 'awaiting_next_step' | 'solved';
   feedbackStatus: FeedbackStatus;
   feedbackMessage: string;
@@ -18,7 +28,7 @@ interface AppState {
 type AppAction = 
   | { type: 'CHECK_STEP_START' }
   | { type: 'CHECK_STEP_SUCCESS'; payload: { step: string; message: string; feedbackStatus: FeedbackStatus } }
-  | { type: 'CHECK_STEP_ERROR'; payload: { message: string } }
+  | { type: 'CHECK_STEP_ERROR'; payload: { step: string; message: string } }
   | { type: 'PROBLEM_SOLVED'; payload: { step: string; message: string } }
   | { type: 'RESET_FEEDBACK' };
 
@@ -33,31 +43,61 @@ function appReducer(state: AppState, action: AppAction): AppState {
         feedbackMessage: 'Checking your answer...'
       };
     
-    case 'CHECK_STEP_SUCCESS':
+    case 'CHECK_STEP_SUCCESS': {
+      const successAttempt: StudentAttempt = {
+        input: action.payload.step,
+        isCorrect: true,
+        feedback: action.payload.message,
+        timestamp: new Date(),
+        stepNumber: state.userHistory.length
+      };
+      
       return {
         ...state,
         userHistory: [...state.userHistory, action.payload.step],
+        allAttempts: [...state.allAttempts, successAttempt],
         currentStatus: 'awaiting_next_step',
         feedbackStatus: action.payload.feedbackStatus,
         feedbackMessage: action.payload.message
       };
+    }
     
-    case 'CHECK_STEP_ERROR':
+    case 'CHECK_STEP_ERROR': {
+      const errorAttempt: StudentAttempt = {
+        input: action.payload.step,
+        isCorrect: false,
+        feedback: action.payload.message,
+        timestamp: new Date(),
+        stepNumber: state.userHistory.length
+      };
+      
       return {
         ...state,
+        allAttempts: [...state.allAttempts, errorAttempt],
         currentStatus: 'awaiting_next_step',
         feedbackStatus: 'error',
         feedbackMessage: action.payload.message
       };
+    }
     
-    case 'PROBLEM_SOLVED':
+    case 'PROBLEM_SOLVED': {
+      const solvedAttempt: StudentAttempt = {
+        input: action.payload.step,
+        isCorrect: true,
+        feedback: action.payload.message,
+        timestamp: new Date(),
+        stepNumber: state.userHistory.length
+      };
+      
       return {
         ...state,
         userHistory: [...state.userHistory, action.payload.step],
+        allAttempts: [...state.allAttempts, solvedAttempt],
         currentStatus: 'solved',
         feedbackStatus: 'success',
         feedbackMessage: action.payload.message
       };
+    }
     
     case 'RESET_FEEDBACK':
       return {
@@ -79,6 +119,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
   // Initialize state with problem statement in history
   const initialState: AppState = {
     userHistory: [problem.problemStatement],
+    allAttempts: [],
     currentStatus: 'awaiting_next_step',
     feedbackStatus: 'idle',
     feedbackMessage: ''
@@ -130,17 +171,17 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
           
           case 'EQUIVALENCE_FAILURE':
             message = 'That doesn\'t look quite right. Check your arithmetic and try again.';
-            dispatch({ type: 'CHECK_STEP_ERROR', payload: { message } });
+            dispatch({ type: 'CHECK_STEP_ERROR', payload: { step: studentInput, message } });
             return;
           
           case 'PARSING_ERROR':
             message = result.errorMessage || 'I couldn\'t understand that format. Please check your input.';
-            dispatch({ type: 'CHECK_STEP_ERROR', payload: { message } });
+            dispatch({ type: 'CHECK_STEP_ERROR', payload: { step: studentInput, message } });
             return;
           
           default:
             message = 'Something unexpected happened. Please try again.';
-            dispatch({ type: 'CHECK_STEP_ERROR', payload: { message } });
+            dispatch({ type: 'CHECK_STEP_ERROR', payload: { step: studentInput, message } });
             return;
         }
 
@@ -159,6 +200,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 
       } catch (error) {
         dispatch({ type: 'CHECK_STEP_ERROR', payload: { 
+          step: studentInput,
           message: 'An error occurred while checking your answer. Please try again.' 
         }});
       }
@@ -180,7 +222,11 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
       <ProblemView problem={problem} />
 
       {/* Steps History */}
-      <StepsHistory history={state.userHistory} isSolved={isSolved} />
+      <StepsHistory 
+        history={state.userHistory} 
+        allAttempts={state.allAttempts}
+        isSolved={isSolved} 
+      />
 
       {/* User Input */}
       <UserInput 
@@ -196,4 +242,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
       />
     </div>
   );
-} 
+}
+
+// Export the StudentAttempt type for use in other components
+export type { StudentAttempt }; 
