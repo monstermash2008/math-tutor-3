@@ -304,7 +304,7 @@ export default function ProblemCreator({
 								<div className="space-y-2">
 									{formData.solutionSteps.map((step, index) => (
 										<div
-											key={`step-${index}`}
+											key={step || `empty-step-${Math.random()}`}
 											className="flex items-center gap-2"
 										>
 											<span className="text-sm text-gray-500 min-w-8">
@@ -579,7 +579,7 @@ export default function ProblemCreator({
 											.filter((step) => step.trim())
 											.map((step, index) => (
 												<li
-													key={`preview-step-${index}`}
+													key={step}
 													className="flex items-center gap-2"
 												>
 													<span className="text-sm text-gray-500 min-w-6">
