@@ -15,3 +15,6 @@ dist-ssr
 # Development
 .vinxi
 .wrangler
+
+# Test coverage
+coverage
