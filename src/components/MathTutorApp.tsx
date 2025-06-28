@@ -1,6 +1,9 @@
+import { useMutation } from '@tanstack/react-query';
 import { useReducer } from 'react';
+import type { LLMFeedbackRequest } from '../lib/llm-feedback-service';
+import { constructPrompt, llmFeedbackMutationFn } from '../lib/llm-feedback-service';
 import type { ProblemModel, ValidationContext } from '../lib/validation-engine';
-import { isProblemSolved, validateStep } from '../lib/validation-engine';
+import { validateStep } from '../lib/validation-engine';
 import { FeedbackDisplay, type FeedbackStatus } from './FeedbackDisplay';
 import { ProblemView } from './ProblemView';
 import { StepsHistory } from './StepsHistory';
@@ -22,6 +25,7 @@ interface AppState {
   currentStatus: 'idle' | 'checking' | 'awaiting_next_step' | 'solved';
   feedbackStatus: FeedbackStatus;
   feedbackMessage: string;
+  currentPrompt?: string; // For testing/debugging: shows the prompt sent to LLM
 }
 
 // State actions
@@ -30,6 +34,9 @@ type AppAction =
   | { type: 'CHECK_STEP_SUCCESS'; payload: { step: string; message: string; feedbackStatus: FeedbackStatus } }
   | { type: 'CHECK_STEP_ERROR'; payload: { step: string; message: string } }
   | { type: 'PROBLEM_SOLVED'; payload: { step: string; message: string } }
+  | { type: 'LLM_FEEDBACK_SUCCESS'; payload: { message: string; feedbackStatus: FeedbackStatus } }
+  | { type: 'LLM_FEEDBACK_ERROR'; payload: { message: string } }
+  | { type: 'LLM_PROMPT_SENT'; payload: { prompt: string } }
   | { type: 'RESET_FEEDBACK' };
 
 // State reducer
@@ -98,12 +105,33 @@ function appReducer(state: AppState, action: AppAction): AppState {
         feedbackMessage: action.payload.message
       };
     }
+
+    case 'LLM_FEEDBACK_SUCCESS':
+      return {
+        ...state,
+        feedbackStatus: action.payload.feedbackStatus,
+        feedbackMessage: action.payload.message
+      };
+
+    case 'LLM_FEEDBACK_ERROR':
+      return {
+        ...state,
+        feedbackStatus: 'error',
+        feedbackMessage: action.payload.message
+      };
+    
+    case 'LLM_PROMPT_SENT':
+      return {
+        ...state,
+        currentPrompt: action.payload.prompt
+      };
     
     case 'RESET_FEEDBACK':
       return {
         ...state,
         feedbackStatus: 'idle',
-        feedbackMessage: ''
+        feedbackMessage: '',
+        currentPrompt: undefined
       };
     
     default:
@@ -122,12 +150,37 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
     allAttempts: [],
     currentStatus: 'awaiting_next_step',
     feedbackStatus: 'idle',
-    feedbackMessage: ''
+    feedbackMessage: '',
+    currentPrompt: undefined
   };
 
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // Handle step validation (Phase 2: placeholder logic)
+  // LLM feedback mutation
+  const llmFeedbackMutation = useMutation({
+    mutationFn: llmFeedbackMutationFn,
+    onSuccess: (response) => {
+      const feedbackStatus: FeedbackStatus = response.encouragement ? 'success' : 'success';
+      dispatch({
+        type: 'LLM_FEEDBACK_SUCCESS',
+        payload: {
+          message: response.feedback,
+          feedbackStatus
+        }
+      });
+    },
+    onError: (error) => {
+      dispatch({
+        type: 'LLM_FEEDBACK_ERROR',
+        payload: {
+          message: 'Unable to get feedback right now. Please try again.'
+        }
+      });
+      console.error('LLM feedback error:', error);
+    }
+  });
+
+  // Handle step validation with LLM integration
   const handleCheckStep = (studentInput: string) => {
     dispatch({ type: 'CHECK_STEP_START' });
 
@@ -144,59 +197,67 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
         // Validate the step
         const result = validateStep(context);
         
-        // Generate placeholder feedback messages based on validation result
-        let message = '';
-        let feedbackStatus: FeedbackStatus = 'success';
+        // Prepare LLM feedback request
+        const llmRequest: LLMFeedbackRequest = {
+          problemStatement: problem.problemStatement,
+          userHistory: state.userHistory,
+          studentInput,
+          validationResult: result.result,
+          problemModel: problem
+        };
 
+        // Generate and store the prompt for debugging
+        const prompt = constructPrompt(llmRequest);
+        dispatch({ type: 'LLM_PROMPT_SENT', payload: { prompt } });
+
+        // Handle different validation results and trigger LLM feedback
         switch (result.result) {
           case 'CORRECT_FINAL_STEP':
-            message = 'Excellent! You solved the problem correctly. Great work!';
-            dispatch({ type: 'PROBLEM_SOLVED', payload: { step: studentInput, message } });
+            dispatch({ type: 'PROBLEM_SOLVED', payload: { step: studentInput, message: 'Problem completed!' } });
+            llmFeedbackMutation.mutate(llmRequest);
             return;
           
           case 'CORRECT_INTERMEDIATE_STEP':
-            message = 'Great job! That\'s the correct next step. Keep going!';
-            feedbackStatus = 'success';
-            break;
-          
           case 'CORRECT_BUT_NOT_SIMPLIFIED':
-            message = 'Correct! But please simplify your answer further.';
-            feedbackStatus = 'warning';
-            break;
-          
           case 'VALID_BUT_NO_PROGRESS':
-            message = 'That\'s mathematically valid, but doesn\'t simplify the problem. Try a different approach.';
-            feedbackStatus = 'warning';
+            // For correct steps, update history first, then get LLM feedback
+            dispatch({ 
+              type: 'CHECK_STEP_SUCCESS', 
+              payload: { 
+                step: studentInput, 
+                message: 'Getting feedback...', 
+                feedbackStatus: 'loading'
+              } 
+            });
+            llmFeedbackMutation.mutate(llmRequest);
             break;
           
           case 'EQUIVALENCE_FAILURE':
-            message = 'That doesn\'t look quite right. Check your arithmetic and try again.';
-            dispatch({ type: 'CHECK_STEP_ERROR', payload: { step: studentInput, message } });
-            return;
-          
           case 'PARSING_ERROR':
-            message = result.errorMessage || 'I couldn\'t understand that format. Please check your input.';
-            dispatch({ type: 'CHECK_STEP_ERROR', payload: { step: studentInput, message } });
+            // For errors, don't update history but still get LLM feedback
+            dispatch({ 
+              type: 'CHECK_STEP_ERROR', 
+              payload: { 
+                step: studentInput, 
+                message: 'Getting feedback...' 
+              } 
+            });
+            llmFeedbackMutation.mutate(llmRequest);
             return;
           
           default:
-            message = 'Something unexpected happened. Please try again.';
-            dispatch({ type: 'CHECK_STEP_ERROR', payload: { step: studentInput, message } });
+            dispatch({ 
+              type: 'CHECK_STEP_ERROR', 
+              payload: { 
+                step: studentInput, 
+                message: 'Something unexpected happened. Please try again.' 
+              } 
+            });
             return;
         }
 
-        // Check if problem is now solved
-        const updatedContext: ValidationContext = {
-          problemModel: problem,
-          userHistory: [...state.userHistory, studentInput],
-          studentInput: ''
-        };
-
-        if (isProblemSolved(updatedContext)) {
-          dispatch({ type: 'PROBLEM_SOLVED', payload: { step: studentInput, message: 'Perfect! You\'ve solved the entire problem!' } });
-        } else {
-          dispatch({ type: 'CHECK_STEP_SUCCESS', payload: { step: studentInput, message, feedbackStatus } });
-        }
+        // For correct steps, the problem solved check is handled above
+        // LLM feedback will provide appropriate messaging
 
       } catch (error) {
         dispatch({ type: 'CHECK_STEP_ERROR', payload: { 
@@ -239,6 +300,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
       <FeedbackDisplay 
         status={state.feedbackStatus}
         message={state.feedbackMessage}
+        prompt={state.currentPrompt}
       />
     </div>
   );

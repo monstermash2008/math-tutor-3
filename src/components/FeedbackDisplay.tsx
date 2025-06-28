@@ -1,11 +1,16 @@
+import { useState } from 'react';
+
 export type FeedbackStatus = 'idle' | 'loading' | 'success' | 'error' | 'warning';
 
 interface FeedbackDisplayProps {
   status: FeedbackStatus;
   message?: string;
+  prompt?: string; // For testing: shows the prompt sent to LLM
 }
 
-export function FeedbackDisplay({ status, message }: FeedbackDisplayProps) {
+export function FeedbackDisplay({ status, message, prompt }: FeedbackDisplayProps) {
+  const [showPrompt, setShowPrompt] = useState(false);
+  
   if (status === 'idle' || !message) {
     return null;
   }
@@ -75,6 +80,35 @@ export function FeedbackDisplay({ status, message }: FeedbackDisplayProps) {
           <p className="mt-1 text-gray-700">{message}</p>
         </div>
       </div>
+      
+      {/* Debug Section: Show LLM Prompt */}
+      {prompt && (
+        <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <button
+            type="button"
+            onClick={() => setShowPrompt(!showPrompt)}
+            className="w-full px-4 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset rounded-lg transition-colors"
+          >
+            <div className="flex items-center justify-between">
+              <span>🔍 Debug: View LLM Prompt</span>
+              <span className={`transform transition-transform ${showPrompt ? 'rotate-90' : ''}`}>
+                ▶️
+              </span>
+            </div>
+          </button>
+          
+          {showPrompt && (
+            <div className="px-4 pb-4">
+              <div className="bg-white border border-gray-300 rounded p-3 mt-2">
+                <h5 className="text-xs font-semibold text-gray-600 mb-2">PROMPT SENT TO LLM:</h5>
+                <pre className="text-xs text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
+                  {prompt}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 } 

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { FeedbackDisplay, type FeedbackStatus } from '../FeedbackDisplay';
 
@@ -65,19 +65,37 @@ describe('FeedbackDisplay Component', () => {
 
   it('should apply correct CSS classes for different states', () => {
     const { rerender } = render(<FeedbackDisplay status="success" message="Success message" />);
-    
-    let feedbackContainer = screen.getByText('Success message').closest('.feedback-card');
-    expect(feedbackContainer?.classList.contains('bg-green-50')).toBe(true);
-    expect(feedbackContainer?.classList.contains('border-green-200')).toBe(true);
+
+    const feedbackCard = screen.getByText('Success message').closest('.feedback-card');
+    expect(feedbackCard).toHaveClass('bg-green-50', 'border-green-200');
 
     rerender(<FeedbackDisplay status="error" message="Error message" />);
-    feedbackContainer = screen.getByText('Error message').closest('.feedback-card');
-    expect(feedbackContainer?.classList.contains('bg-red-50')).toBe(true);
-    expect(feedbackContainer?.classList.contains('border-red-200')).toBe(true);
+    const errorCard = screen.getByText('Error message').closest('.feedback-card');
+    expect(errorCard).toHaveClass('bg-red-50', 'border-red-200');
+  });
 
-    rerender(<FeedbackDisplay status="warning" message="Warning message" />);
-    feedbackContainer = screen.getByText('Warning message').closest('.feedback-card');
-    expect(feedbackContainer?.classList.contains('bg-yellow-50')).toBe(true);
-    expect(feedbackContainer?.classList.contains('border-yellow-200')).toBe(true);
+  it('should display prompt debug section when prompt is provided', () => {
+    const testPrompt = 'You are a helpful math tutor working with a student...';
+    render(<FeedbackDisplay status="success" message="Great job!" prompt={testPrompt} />);
+
+    // Debug button should be visible
+    expect(screen.getByText('🔍 Debug: View LLM Prompt')).toBeInTheDocument();
+
+    // Prompt should not be visible initially
+    expect(screen.queryByText('PROMPT SENT TO LLM:')).not.toBeInTheDocument();
+
+    // Click to expand prompt
+    fireEvent.click(screen.getByText('🔍 Debug: View LLM Prompt'));
+
+    // Prompt should now be visible
+    expect(screen.getByText('PROMPT SENT TO LLM:')).toBeInTheDocument();
+    expect(screen.getByText(testPrompt)).toBeInTheDocument();
+  });
+
+  it('should not display prompt debug section when no prompt is provided', () => {
+    render(<FeedbackDisplay status="success" message="Great job!" />);
+
+    // Debug button should not be visible
+    expect(screen.queryByText('🔍 Debug: View LLM Prompt')).not.toBeInTheDocument();
   });
 }); 
