@@ -8,23 +8,20 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { createServerRootRoute } from '@tanstack/react-start/server'
-
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LibraryRouteImport } from './routes/library'
+import { Route as CreateRouteImport } from './routes/create'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProblemProblemIdRouteImport } from './routes/problem/$problemId'
-import { Route as DemoTanstackQueryRouteImport } from './routes/demo.tanstack-query'
-import { Route as DemoConvexRouteImport } from './routes/demo.convex'
-import { Route as DemoStartServerFuncsRouteImport } from './routes/demo.start.server-funcs'
-import { Route as DemoStartApiRequestRouteImport } from './routes/demo.start.api-request'
-import { ServerRoute as ApiDemoNamesServerRouteImport } from './routes/api.demo-names'
-
-const rootServerRouteImport = createServerRootRoute()
 
 const LibraryRoute = LibraryRouteImport.update({
   id: '/library',
   path: '/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreateRoute = CreateRouteImport.update({
+  id: '/create',
+  path: '/create',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -37,119 +34,39 @@ const ProblemProblemIdRoute = ProblemProblemIdRouteImport.update({
   path: '/problem/$problemId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DemoTanstackQueryRoute = DemoTanstackQueryRouteImport.update({
-  id: '/demo/tanstack-query',
-  path: '/demo/tanstack-query',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoConvexRoute = DemoConvexRouteImport.update({
-  id: '/demo/convex',
-  path: '/demo/convex',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoStartServerFuncsRoute = DemoStartServerFuncsRouteImport.update({
-  id: '/demo/start/server-funcs',
-  path: '/demo/start/server-funcs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoStartApiRequestRoute = DemoStartApiRequestRouteImport.update({
-  id: '/demo/start/api-request',
-  path: '/demo/start/api-request',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiDemoNamesServerRoute = ApiDemoNamesServerRouteImport.update({
-  id: '/api/demo-names',
-  path: '/api/demo-names',
-  getParentRoute: () => rootServerRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/create': typeof CreateRoute
   '/library': typeof LibraryRoute
-  '/demo/convex': typeof DemoConvexRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/problem/$problemId': typeof ProblemProblemIdRoute
-  '/demo/start/api-request': typeof DemoStartApiRequestRoute
-  '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/create': typeof CreateRoute
   '/library': typeof LibraryRoute
-  '/demo/convex': typeof DemoConvexRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/problem/$problemId': typeof ProblemProblemIdRoute
-  '/demo/start/api-request': typeof DemoStartApiRequestRoute
-  '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/create': typeof CreateRoute
   '/library': typeof LibraryRoute
-  '/demo/convex': typeof DemoConvexRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/problem/$problemId': typeof ProblemProblemIdRoute
-  '/demo/start/api-request': typeof DemoStartApiRequestRoute
-  '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/library'
-    | '/demo/convex'
-    | '/demo/tanstack-query'
-    | '/problem/$problemId'
-    | '/demo/start/api-request'
-    | '/demo/start/server-funcs'
+  fullPaths: '/' | '/create' | '/library' | '/problem/$problemId'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/library'
-    | '/demo/convex'
-    | '/demo/tanstack-query'
-    | '/problem/$problemId'
-    | '/demo/start/api-request'
-    | '/demo/start/server-funcs'
-  id:
-    | '__root__'
-    | '/'
-    | '/library'
-    | '/demo/convex'
-    | '/demo/tanstack-query'
-    | '/problem/$problemId'
-    | '/demo/start/api-request'
-    | '/demo/start/server-funcs'
+  to: '/' | '/create' | '/library' | '/problem/$problemId'
+  id: '__root__' | '/' | '/create' | '/library' | '/problem/$problemId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CreateRoute: typeof CreateRoute
   LibraryRoute: typeof LibraryRoute
-  DemoConvexRoute: typeof DemoConvexRoute
-  DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
   ProblemProblemIdRoute: typeof ProblemProblemIdRoute
-  DemoStartApiRequestRoute: typeof DemoStartApiRequestRoute
-  DemoStartServerFuncsRoute: typeof DemoStartServerFuncsRoute
-}
-export interface FileServerRoutesByFullPath {
-  '/api/demo-names': typeof ApiDemoNamesServerRoute
-}
-export interface FileServerRoutesByTo {
-  '/api/demo-names': typeof ApiDemoNamesServerRoute
-}
-export interface FileServerRoutesById {
-  __root__: typeof rootServerRouteImport
-  '/api/demo-names': typeof ApiDemoNamesServerRoute
-}
-export interface FileServerRouteTypes {
-  fileServerRoutesByFullPath: FileServerRoutesByFullPath
-  fullPaths: '/api/demo-names'
-  fileServerRoutesByTo: FileServerRoutesByTo
-  to: '/api/demo-names'
-  id: '__root__' | '/api/demo-names'
-  fileServerRoutesById: FileServerRoutesById
-}
-export interface RootServerRouteChildren {
-  ApiDemoNamesServerRoute: typeof ApiDemoNamesServerRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -159,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/library'
       fullPath: '/library'
       preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/create': {
+      id: '/create'
+      path: '/create'
+      fullPath: '/create'
+      preLoaderRoute: typeof CreateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -175,63 +99,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProblemProblemIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/demo/tanstack-query': {
-      id: '/demo/tanstack-query'
-      path: '/demo/tanstack-query'
-      fullPath: '/demo/tanstack-query'
-      preLoaderRoute: typeof DemoTanstackQueryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/convex': {
-      id: '/demo/convex'
-      path: '/demo/convex'
-      fullPath: '/demo/convex'
-      preLoaderRoute: typeof DemoConvexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/start/server-funcs': {
-      id: '/demo/start/server-funcs'
-      path: '/demo/start/server-funcs'
-      fullPath: '/demo/start/server-funcs'
-      preLoaderRoute: typeof DemoStartServerFuncsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/start/api-request': {
-      id: '/demo/start/api-request'
-      path: '/demo/start/api-request'
-      fullPath: '/demo/start/api-request'
-      preLoaderRoute: typeof DemoStartApiRequestRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-  }
-}
-declare module '@tanstack/react-start/server' {
-  interface ServerFileRoutesByPath {
-    '/api/demo-names': {
-      id: '/api/demo-names'
-      path: '/api/demo-names'
-      fullPath: '/api/demo-names'
-      preLoaderRoute: typeof ApiDemoNamesServerRouteImport
-      parentRoute: typeof rootServerRouteImport
-    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CreateRoute: CreateRoute,
   LibraryRoute: LibraryRoute,
-  DemoConvexRoute: DemoConvexRoute,
-  DemoTanstackQueryRoute: DemoTanstackQueryRoute,
   ProblemProblemIdRoute: ProblemProblemIdRoute,
-  DemoStartApiRequestRoute: DemoStartApiRequestRoute,
-  DemoStartServerFuncsRoute: DemoStartServerFuncsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-const rootServerRouteChildren: RootServerRouteChildren = {
-  ApiDemoNamesServerRoute: ApiDemoNamesServerRoute,
-}
-export const serverRouteTree = rootServerRouteImport
-  ._addFileChildren(rootServerRouteChildren)
-  ._addFileTypes<FileServerRouteTypes>()

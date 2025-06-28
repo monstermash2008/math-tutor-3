@@ -10,10 +10,15 @@
     "test": "vitest run",
     "format": "biome format",
     "lint": "biome lint",
-    "check": "biome check"
+    "check": "biome check",
+    "seed": "convex run migrations:seedProblems"
   },
   "dependencies": {
     "@convex-dev/react-query": "0.0.0-alpha.8",
+    "@hookform/resolvers": "^5.1.1",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-select": "^2.2.5",
+    "@radix-ui/react-slot": "^1.2.3",
     "@t3-oss/env-core": "^0.12.0",
     "@tailwindcss/vite": "^4.0.6",
     "@tanstack/react-query": "^5.66.5",
@@ -30,6 +35,7 @@
     "mathjs": "^14.5.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-hook-form": "^7.59.0",
     "tailwind-merge": "^3.0.2",
     "tailwindcss": "^4.0.6",
     "tailwindcss-animate": "^1.0.7",

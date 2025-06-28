@@ -1,8 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
 	type LLMFeedbackRequest,
 	constructPrompt,
-	getLLMFeedback,
 } from "../llm-feedback-service";
 import type { ProblemModel, ValidationResult } from "../validation-engine";
 
@@ -15,13 +14,13 @@ vi.mock("../env", () => ({
 
 describe("LLM Feedback Service", () => {
 	const mockProblem: ProblemModel = {
-		problemId: "test-001",
+		_id: "test-001",
 		problemStatement: "Solve for x: 5x + 3 = 2x + 12",
 		problemType: "SOLVE_EQUATION",
-		teacherModel: {
-			type: "sequential_steps",
-			steps: ["3x + 3 = 12", "3x = 9", "x = 3"],
-		},
+		solutionSteps: ["3x + 3 = 12", "3x = 9", "x = 3"],
+		difficulty: "Medium",
+		isPublic: true,
+		timesAttempted: 0,
 	};
 
 	const baseLLMRequest: LLMFeedbackRequest = {
@@ -47,7 +46,9 @@ describe("LLM Feedback Service", () => {
 			expect(prompt).toContain("You are a math tutor");
 			expect(prompt).toContain("Solve for x: 5x + 3 = 2x + 12");
 			expect(prompt).toContain("Student input: x = 3");
-			expect(prompt).toContain("Student solved the problem! Briefly confirm correctness. 1 sentence.");
+			expect(prompt).toContain(
+				"Student solved the problem! Briefly confirm correctness. 1 sentence.",
+			);
 		});
 
 		it("should construct correct prompts for CORRECT_INTERMEDIATE_STEP", () => {
@@ -87,7 +88,9 @@ describe("LLM Feedback Service", () => {
 			const prompt = constructPrompt(request);
 
 			expect(prompt).toContain("Student made an error");
-			expect(prompt).toContain("Point out there's an error, ask them to check their work");
+			expect(prompt).toContain(
+				"Point out there's an error, ask them to check their work",
+			);
 			expect(prompt).toContain("1-2 sentences");
 		});
 
@@ -101,7 +104,9 @@ describe("LLM Feedback Service", () => {
 			const prompt = constructPrompt(request);
 
 			expect(prompt).toContain("Student's input has formatting issues");
-			expect(prompt).toContain("Explain how to format math expressions clearly");
+			expect(prompt).toContain(
+				"Explain how to format math expressions clearly",
+			);
 			expect(prompt).toContain("1 sentence");
 		});
 
@@ -129,25 +134,31 @@ describe("LLM Feedback Service", () => {
 			const request = {
 				...baseLLMRequest,
 				feedbackHistory: {
-					2: [{
-						id: 'feedback1',
-						stepIndex: 2,
-						feedback: 'First attempt feedback',
-						timestamp: Date.now(),
-						order: 1,
-						validationResult: 'EQUIVALENCE_FAILURE' as ValidationResult
-					}]
+					2: [
+						{
+							id: "feedback1",
+							stepIndex: 2,
+							feedback: "First attempt feedback",
+							timestamp: Date.now(),
+							order: 1,
+							validationResult: "EQUIVALENCE_FAILURE" as ValidationResult,
+						},
+					],
 				},
 				studentInput: "x = 4",
 				validationResult: "EQUIVALENCE_FAILURE" as const,
-				currentStepIndex: 2
+				currentStepIndex: 2,
 			};
 			const prompt = constructPrompt(request);
 
-			expect(prompt).toContain("Previous feedback given to student for this step:");
+			expect(prompt).toContain(
+				"Previous feedback given to student for this step:",
+			);
 			expect(prompt).toContain("Attempt 1: First attempt feedback");
 			expect(prompt).toContain("Don't repeat information already given");
-			expect(prompt).toContain("Identify which part has the error without giving the answer");
+			expect(prompt).toContain(
+				"Identify which part has the error without giving the answer",
+			);
 		});
 
 		it("should provide progressive hints based on attempt number", () => {
@@ -155,29 +166,35 @@ describe("LLM Feedback Service", () => {
 			const firstAttempt = {
 				...baseLLMRequest,
 				feedbackHistory: {},
-				validationResult: "EQUIVALENCE_FAILURE" as const
+				validationResult: "EQUIVALENCE_FAILURE" as const,
 			};
 			const firstPrompt = constructPrompt(firstAttempt);
-			expect(firstPrompt).toContain("Point out there's an error, ask them to check their work");
+			expect(firstPrompt).toContain(
+				"Point out there's an error, ask them to check their work",
+			);
 
-			// Second attempt - moderate hints  
+			// Second attempt - moderate hints
 			const secondAttempt = {
 				...baseLLMRequest,
 				feedbackHistory: {
-					2: [{
-						id: 'feedback1',
-						stepIndex: 2,
-						feedback: 'First feedback',
-						timestamp: Date.now(),
-						order: 1,
-						validationResult: "EQUIVALENCE_FAILURE" as ValidationResult
-					}]
+					2: [
+						{
+							id: "feedback1",
+							stepIndex: 2,
+							feedback: "First feedback",
+							timestamp: Date.now(),
+							order: 1,
+							validationResult: "EQUIVALENCE_FAILURE" as ValidationResult,
+						},
+					],
 				},
 				validationResult: "EQUIVALENCE_FAILURE" as const,
-				currentStepIndex: 2
+				currentStepIndex: 2,
 			};
 			const secondPrompt = constructPrompt(secondAttempt);
-			expect(secondPrompt).toContain("Identify which part has the error without giving the answer");
+			expect(secondPrompt).toContain(
+				"Identify which part has the error without giving the answer",
+			);
 
 			// Third attempt - detailed hints
 			const thirdAttempt = {
@@ -185,28 +202,30 @@ describe("LLM Feedback Service", () => {
 				feedbackHistory: {
 					2: [
 						{
-							id: 'feedback1',
+							id: "feedback1",
 							stepIndex: 2,
-							feedback: 'First feedback',
+							feedback: "First feedback",
 							timestamp: Date.now(),
 							order: 1,
-							validationResult: "EQUIVALENCE_FAILURE" as ValidationResult
+							validationResult: "EQUIVALENCE_FAILURE" as ValidationResult,
 						},
 						{
-							id: 'feedback2',
+							id: "feedback2",
 							stepIndex: 2,
-							feedback: 'Second feedback',
+							feedback: "Second feedback",
 							timestamp: Date.now(),
 							order: 2,
-							validationResult: "EQUIVALENCE_FAILURE" as ValidationResult
-						}
-					]
+							validationResult: "EQUIVALENCE_FAILURE" as ValidationResult,
+						},
+					],
 				},
 				validationResult: "EQUIVALENCE_FAILURE" as const,
-				currentStepIndex: 2
+				currentStepIndex: 2,
 			};
 			const thirdPrompt = constructPrompt(thirdAttempt);
-			expect(thirdPrompt).toContain("Explain what went wrong and hint at the correct approach");
+			expect(thirdPrompt).toContain(
+				"Explain what went wrong and hint at the correct approach",
+			);
 		});
 	});
 });
