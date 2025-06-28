@@ -3,8 +3,15 @@ node_modules
 dist
 dist-ssr
 *.local
-count.txt
 .env
 .output
 .vinxi
-count.txt
+
+# Build outputs
+.output
+.nitro
+.tanstack
+
+# Development
+.vinxi
+.wrangler
