@@ -1,7 +1,9 @@
 import {
 	MathParsingError,
 	areEquivalent,
+	getCanonical,
 	isFullySimplified,
+	validateMathInputSyntax,
 } from "./math-engine";
 
 /**
@@ -65,6 +67,9 @@ export function validateStep(context: ValidationContext): StepValidationResult {
 	const { problemModel, userHistory, studentInput } = context;
 
 	try {
+		// Validate input syntax upfront to catch parsing errors early
+		validateMathInputSyntax(studentInput);
+		
 		// Get the previous step (last correct step in history)
 		const previousStep = userHistory[userHistory.length - 1];
 		const teacherSteps = problemModel.solutionSteps;

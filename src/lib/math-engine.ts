@@ -35,45 +35,76 @@ function validateMathInput(input: string): void {
 	}
 }
 
-export function getCanonical(input: string): MathNode {
-	try {
-		const trimmedInput = input.trim();
+/**
+ * Validates and parses mathematical input syntax
+ * This is a lightweight validation function that extracts common parsing logic
+ * 
+ * @param input - The mathematical string to validate and parse
+ * @returns Parsed input data with validation completed
+ * @throws MathParsingError if the input has syntax errors
+ */
+export function validateMathInputSyntax(input: string): {
+	trimmedInput: string;
+	isEquation: boolean;
+	leftSide?: string;
+	rightSide?: string;
+} {
+	const trimmedInput = input.trim();
 
-		if (!trimmedInput) {
-			throw new MathParsingError("Empty input provided", input);
+	if (!trimmedInput) {
+		throw new MathParsingError("Empty input provided", input);
+	}
+
+	// Validate input for obviously malformed expressions
+	validateMathInput(trimmedInput);
+
+	// Handle equations (contains '=')
+	if (trimmedInput.includes("=")) {
+		const sides = trimmedInput.split("=");
+
+		if (sides.length !== 2) {
+			throw new MathParsingError(
+				"Invalid equation format: equations must have exactly one equals sign",
+				input,
+			);
 		}
 
-		// Validate input for obviously malformed expressions
-		validateMathInput(trimmedInput);
+		const [leftSide, rightSide] = sides;
 
-		// Handle equations (contains '=')
-		if (trimmedInput.includes("=")) {
-			const sides = trimmedInput.split("=");
+		if (!leftSide.trim() || !rightSide.trim()) {
+			throw new MathParsingError(
+				"Invalid equation format: both sides of equation must contain expressions",
+				input,
+			);
+		}
 
-			if (sides.length !== 2) {
-				throw new MathParsingError(
-					"Invalid equation format: equations must have exactly one equals sign",
-					input,
-				);
-			}
+		return {
+			trimmedInput,
+			isEquation: true,
+			leftSide: leftSide.trim(),
+			rightSide: rightSide.trim(),
+		};
+	}
 
-			const [leftSide, rightSide] = sides;
+	return {
+		trimmedInput,
+		isEquation: false,
+	};
+}
 
-			if (!leftSide.trim() || !rightSide.trim()) {
-				throw new MathParsingError(
-					"Invalid equation format: both sides of equation must contain expressions",
-					input,
-				);
-			}
+export function getCanonical(input: string): MathNode {
+	try {
+		const parsed = validateMathInputSyntax(input);
 
+		if (parsed.isEquation) {
 			// Transform A = B into A - B and simplify
-			const differenceExpression = `(${leftSide.trim()}) - (${rightSide.trim()})`;
+			const differenceExpression = `(${parsed.leftSide}) - (${parsed.rightSide})`;
 			const node = parse(differenceExpression);
 			return simplify(node);
 		}
 
 		// Handle regular expressions
-		const node = parse(trimmedInput);
+		const node = parse(parsed.trimmedInput);
 		return simplify(node);
 	} catch (error) {
 		if (error instanceof MathParsingError) {
@@ -97,33 +128,18 @@ export function getCanonical(input: string): MathNode {
  */
 export function isFullySimplified(input: string): boolean {
 	try {
-		const trimmedInput = input.trim();
+		const parsed = validateMathInputSyntax(input);
 
-		if (!trimmedInput) {
-			return false;
-		}
-
-		// First check if input is valid by trying to parse it
-		validateMathInput(trimmedInput);
-
-		// Handle equations
-		if (trimmedInput.includes("=")) {
-			const sides = trimmedInput.split("=");
-			if (sides.length !== 2) {
-				return false;
-			}
-
-			const [leftSide, rightSide] = sides;
-
+		if (parsed.isEquation && parsed.leftSide && parsed.rightSide) {
 			// Check if both sides are individually simplified
-			const leftSimplified = isExpressionSimplified(leftSide.trim());
-			const rightSimplified = isExpressionSimplified(rightSide.trim());
+			const leftSimplified = isExpressionSimplified(parsed.leftSide);
+			const rightSimplified = isExpressionSimplified(parsed.rightSide);
 
 			return leftSimplified && rightSimplified;
 		}
 
 		// Handle regular expressions
-		return isExpressionSimplified(trimmedInput);
+		return isExpressionSimplified(parsed.trimmedInput);
 	} catch {
 		// If validation or parsing fails, it's not a valid simplified expression
 		return false;
@@ -192,7 +208,7 @@ function isExpressionSimplified(expression: string): boolean {
  */
 export function areEquivalent(expr1: string, expr2: string): boolean {
 	try {
-		// First, validate both expressions can be parsed - if either fails, they're not equivalent
+		// Validate both expressions to catch malformed input early
 		validateMathInput(expr1);
 		validateMathInput(expr2);
 
