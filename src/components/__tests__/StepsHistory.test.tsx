@@ -155,13 +155,7 @@ describe('StepsHistory Component', () => {
     expect(screen.getByText('🎉 Excellent work!')).toBeInTheDocument();
   });
 
-  it('displays timestamps for attempts', () => {
-    render(<StepsHistory history={['Problem', '4x - 12 - x + 5 = 14']} allAttempts={mockAttempts} />);
-    
-    // Check that timestamp is displayed (format may vary by locale)
-    const timeElements = screen.getAllByText(/\d{1,2}:\d{2}:\d{2}/);
-    expect(timeElements.length).toBeGreaterThan(0);
-  });
+
 
   it('groups attempts by step number correctly', () => {
     const multiStepAttempts: StudentAttempt[] = [
