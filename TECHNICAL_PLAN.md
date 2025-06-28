@@ -327,3 +327,469 @@ Step 5: Enhanced Features
 - Implement usage analytics and tracking
 - Add problem categorization and tagging
 - Create problem duplication and templating features
+
+Phase 6a: Tree-Based Simplification Detection & Validation
+Objective: To replace string-based mathematical analysis with powerful expression tree manipulation using math.js filter, traverse, and transform methods. This phase will dramatically improve the accuracy of simplification detection and mathematical validation.
+
+Key Components/Modules:
+
+Advanced Simplification Engine (math-engine-advanced.ts): A new module that leverages math.js expression trees for precise mathematical analysis.
+
+Tree Pattern Detection: Functions that use node.filter() to identify specific mathematical patterns like constant arithmetic operations, like terms, and combinable expressions.
+
+Tree Traversal Validation: Functions that use node.traverse() to walk through expression trees and validate mathematical transformations.
+
+Enhanced Validation Results: Expanded validation result types that provide specific feedback about what operations can be performed.
+
+Technical Challenges & Considerations:
+
+Pattern Recognition Complexity: Creating comprehensive filters that can identify all types of unsimplified mathematical patterns (constant operations, like terms, distributive opportunities, etc.).
+
+Node Type Handling: Understanding and properly handling all math.js node types (ConstantNode, SymbolNode, OperatorNode, FunctionNode, etc.) in traversal and filtering operations.
+
+Performance Optimization: Ensuring tree traversal operations remain fast even for complex expressions with many nodes.
+
+False Positive Prevention: Avoiding incorrect simplification detection for expressions that are actually already in their simplest form.
+
+TDD Testing Scenarios:
+
+Tree-Based Simplification Detection:
+- Expression '2 + 3 + x' -> should detect constant arithmetic operation (2 + 3)
+- Expression '3x + 2x + 5' -> should detect like terms (3x + 2x)
+- Expression '4(x + 2) + 3' -> should detect distributive opportunity
+- Expression 'x + 5' -> should return no simplification needed
+- Expression '2x + 3y' -> should return no simplification needed
+
+Pattern Filter Testing:
+- node.filter() should correctly identify all ConstantNode operations
+- node.filter() should correctly identify like terms with same variables
+- node.filter() should handle nested expressions and complex structures
+
+Tree Traversal Validation:
+- node.traverse() should visit all nodes in correct order
+- Tree traversal should correctly identify operation types and validate transformations
+- Traversal should handle edge cases like single terms and complex nested structures
+
+Implementation Steps:
+
+Step 1: Core Tree Analysis Functions
+- Implement hasConstantOperations() using node.filter() for constant arithmetic detection
+- Create findLikeTerms() using node.filter() for identifying combinable terms
+- Build hasUnsimplifiedOperations() using node.traverse() for comprehensive analysis
+
+Step 2: Enhanced Validation Integration
+- Replace string-based isFullySimplified() with tree-based implementation
+- Update validation engine to use tree analysis results
+- Add specific feedback generation based on detected patterns
+
+Step 3: Pattern Detection Library
+- Create comprehensive pattern detection functions for all common simplification opportunities
+- Implement coefficient detection and normalization using tree traversal
+- Add support for detecting distributive property opportunities
+
+Phase 6b: Canonical Form Enhancement via Tree Transformation
+Objective: To implement robust canonical form generation using math.js tree transformation methods, ensuring mathematically equivalent expressions always produce identical canonical representations.
+
+Key Components/Modules:
+
+Tree Transformation Engine: Functions that use node.transform() to systematically convert expressions to canonical form.
+
+Term Ordering System: Logic to consistently order variables, coefficients, and terms using tree manipulation.
+
+Coefficient Normalization: Tree transformation functions to handle coefficient representation (e.g., 1*x becomes x, -1*x becomes -x).
+
+Canonical Comparison Utils: Enhanced comparison functions that work with canonicalized expression trees rather than strings.
+
+Technical Challenges & Considerations:
+
+Consistent Transformation Rules: Establishing a comprehensive set of transformation rules that produce identical canonical forms for all equivalent expressions.
+
+Variable Ordering Standards: Implementing alphabetical variable ordering (x before y) and power ordering (x^2 before x) consistently across all expressions.
+
+Coefficient Handling: Properly handling implicit coefficients, negative coefficients, and fractional coefficients in tree transformations.
+
+Equation vs Expression Handling: Maintaining separate canonical form rules for equations (A = B → A - B) versus pure expressions.
+
+TDD Testing Scenarios:
+
+Tree Transformation Testing:
+- '2x + 10' and '10 + 2x' -> should produce identical canonical trees
+- '3x^2 + 2x + 1' and '1 + 2x + 3x^2' -> should produce identical canonical trees
+- 'x + y' and 'y + x' -> should produce identical canonical trees (alphabetical ordering)
+- '1*x + 0*y' -> should transform to 'x' (coefficient normalization)
+
+Canonical Form Consistency:
+- Multiple equivalent expressions should all produce the same canonical tree structure
+- Canonical trees should be deterministic (same input always produces same output)
+- Tree comparison should be faster and more reliable than string comparison
+
+Equation Canonicalization:
+- '3x = 9' and '9 = 3x' -> should produce identical canonical trees
+- '5x + 3 = 2x + 12' -> should canonicalize to consistent form
+- Complex equations should maintain mathematical equivalence after canonicalization
+
+Implementation Steps:
+
+Step 1: Basic Tree Transformation
+- Implement term reordering using node.transform() for consistent variable ordering
+- Create coefficient normalization functions for handling implicit and explicit coefficients
+- Build canonical form generator that applies all transformation rules systematically
+
+Step 2: Enhanced Equivalence Checking
+- Replace string-based areEquivalent() with tree-based canonical comparison
+- Implement fast tree comparison using canonical forms
+- Add support for handling edge cases and complex nested expressions
+
+Step 3: Canonical Form Validation
+- Create comprehensive test suite for canonical form consistency
+- Implement validation functions to ensure canonical forms are mathematically correct
+- Add debugging tools to visualize canonical transformation process
+
+Phase 6c: Intelligent Step Analysis & Enhanced Feedback
+Objective: To implement sophisticated step-by-step analysis that understands what mathematical operations students performed by comparing expression trees, enabling highly specific and pedagogically valuable feedback.
+
+Key Components/Modules:
+
+Tree Comparison Engine: Functions that analyze the differences between two expression trees to identify what mathematical operation was performed.
+
+Operation Classification System: Logic to classify detected changes (combined like terms, distributed, factored, etc.) and validate their correctness.
+
+Contextual Feedback Generator: Enhanced feedback system that provides specific, actionable guidance based on tree analysis results.
+
+Step Validation Framework: Comprehensive validation that goes beyond equivalence to analyze the pedagogical value and correctness of each step.
+
+Technical Challenges & Considerations:
+
+Operation Detection Complexity: Accurately identifying what mathematical operation was performed by comparing before/after expression trees.
+
+Multi-Step Detection: Handling cases where students perform multiple operations in a single step and providing appropriate feedback.
+
+Invalid Operation Feedback: Providing helpful feedback when students make mathematical errors, including identifying the specific type of error.
+
+Pedagogical Value Assessment: Determining whether a mathematically valid step represents meaningful progress toward the solution.
+
+TDD Testing Scenarios:
+
+Step Analysis Testing:
+- From '5x + 3x' to '8x' -> should detect "combined like terms" operation
+- From '3(x + 2)' to '3x + 6' -> should detect "distributed" operation
+- From '2x + 3x + 5' to '2x + 8' -> should detect error in like term combination
+- From 'x^2 + 2x + 1' to '(x + 1)^2' -> should detect "factored" operation
+
+Feedback Generation Testing:
+- Correct simplification -> should provide encouraging feedback with next step hint
+- Incorrect arithmetic -> should provide specific error correction with explanation
+- Valid but unhelpful step -> should suggest more direct approach
+- Multiple errors -> should prioritize most important error for feedback
+
+Operation Classification Testing:
+- Should correctly identify all standard algebraic operations
+- Should handle complex multi-step operations appropriately
+- Should distinguish between valid mathematical operations and errors
+- Should provide confidence scores for operation detection
+
+Implementation Steps:
+
+Step 1: Tree Comparison Foundation
+- Implement expression tree differencing algorithm to identify structural changes
+- Create operation classification system for standard algebraic operations
+- Build basic step analysis framework that can detect simple operations
+
+Step 2: Enhanced Operation Detection
+- Add support for complex operation detection (factoring, expanding, etc.)
+- Implement multi-step operation analysis for cases where students combine operations
+- Create error detection and classification system for common mathematical mistakes
+
+Step 3: Intelligent Feedback System
+- Build contextual feedback generator that provides specific guidance based on detected operations
+- Implement progressive hint system that guides students toward correct solutions
+- Add support for alternative solution paths and multiple valid approaches
+
+Phase n+1: Authentication & User Management (Future)
+Objective: To implement a comprehensive authentication system starting with admin role capabilities, with an extensible foundation for future teacher and student roles. This phase establishes secure access control for problem management and lays the groundwork for role-based permissions.
+
+Key Components/Modules:
+
+Convex Authentication Integration: Leverage Convex's built-in authentication system with support for multiple providers (GitHub, Google, custom email/password).
+
+User Management Schema: Design a flexible user system that can accommodate admin, teacher, and student roles with proper permission inheritance.
+
+Users Table Schema:
+```typescript
+users: defineTable({
+  // Basic User Info
+  email: v.string(),
+  name: v.optional(v.string()),
+  role: v.union(v.literal("admin"), v.literal("teacher"), v.literal("student")),
+  
+  // Profile Information
+  profilePicture: v.optional(v.string()),
+  institution: v.optional(v.string()),
+  grade: v.optional(v.string()), // For students
+  subject: v.optional(v.string()), // For teachers
+  
+  // Account Management
+  isActive: v.boolean(),
+  lastLoginTime: v.optional(v.number()),
+  preferredName: v.optional(v.string()),
+  
+  // Permissions (extensible for future roles)
+  permissions: v.array(v.string()),
+}).index("email", ["email"])
+  .index("role", ["role"])
+  .index("isActive", ["isActive"])
+```
+
+Sessions Table Schema:
+```typescript
+sessions: defineTable({
+  userId: v.id("users"),
+  sessionId: v.string(),
+  deviceInfo: v.optional(v.string()),
+  ipAddress: v.optional(v.string()),
+  expiresAt: v.number(),
+}).index("sessionId", ["sessionId"])
+  .index("userId", ["userId"])
+```
+
+Authentication Context & Hooks: React context provider and custom hooks for managing authentication state throughout the application.
+
+Route Protection Components: Higher-order components and route guards for protecting authenticated and role-specific routes.
+
+Admin Dashboard: Initial admin interface for user management, system settings, and comprehensive problem library management.
+
+Permission System: Flexible permission-based access control that can be extended for granular teacher and student permissions.
+
+Technical Challenges & Considerations:
+
+Authentication Provider Integration: Convex supports multiple authentication providers. The system must be flexible enough to handle GitHub OAuth for developers, Google for educational institutions, and email/password for flexibility.
+
+Role-Based Access Control (RBAC): Implementing a scalable permission system that starts simple (admin-only) but can easily expand to include:
+- Admin: Full system access, user management, all problem operations
+- Teacher: Create/edit/delete own problems, view analytics, manage student assignments
+- Student: View assigned problems, attempt problems, view own progress
+
+Session Management: Secure session handling with proper token management, refresh logic, and logout cleanup across devices.
+
+Route Protection Strategy: Implementing both authentication-based (logged in vs. anonymous) and permission-based (admin vs. teacher vs. student) route protection without creating complex nested logic.
+
+Data Migration: Existing problems and attempts need to be associated with users retroactively, requiring careful migration planning.
+
+Security Considerations: Protecting sensitive operations (user management, problem deletion, analytics access) while maintaining good UX for authorized users.
+
+TDD Testing Scenarios:
+
+Authentication Flow Testing:
+- Test successful login with various providers (GitHub, Google, email/password)
+- Test logout functionality and session cleanup
+- Test automatic session refresh and token expiration handling
+- Test authentication state persistence across browser refreshes
+
+Permission System Testing:
+- Test admin access to all problem management functions
+- Test unauthorized access attempts return proper error responses
+- Test role-based component rendering (admin sees user management, others don't)
+- Test permission inheritance and role validation
+
+Route Protection Testing:
+- Test anonymous user redirect to login page for protected routes
+- Test authenticated user access to appropriate pages based on role
+- Test admin-only routes are inaccessible to future teacher/student roles
+- Test proper fallback routing for insufficient permissions
+
+Database Security Testing:
+- Test that problem creation/editing requires authentication
+- Test that user management operations require admin role
+- Test that users can only access their own data (except admins)
+- Test proper data filtering based on user permissions
+
+Implementation Steps:
+
+Step 1: Authentication Infrastructure
+- Set up Convex authentication with GitHub and Google providers
+- Create user and session database tables with proper indexes
+- Implement authentication context and custom React hooks
+- Create login/logout components with provider selection
+
+Step 2: Route Protection & Navigation
+- Implement authentication middleware for protected routes
+- Create role-based route guards and permission checks
+- Update navigation components to show/hide based on authentication state
+- Add user profile dropdown with logout and account management
+
+Step 3: Admin Role Implementation
+- Create admin dashboard with user management interface
+- Implement admin-specific problem management features (view all, delete any, etc.)
+- Add system settings and configuration management
+- Implement user role assignment and account activation controls
+
+Step 4: Database Migration & Security
+- Update existing Convex functions to require authentication
+- Implement row-level security for user data access
+- Migrate existing problems to be associated with admin users
+- Add audit logging for sensitive operations
+
+Step 5: Permission System Foundation
+- Create extensible permission checking utilities
+- Implement permission-based UI component rendering
+- Add role validation middleware for API operations
+- Document permission architecture for future teacher/student role implementation
+
+Phase n+2: Production Deployment & CI/CD (Future)
+Objective: To establish a robust production deployment pipeline using GitHub Actions for continuous integration and deployment, with comprehensive testing, environment management, and monitoring capabilities.
+
+Key Components/Modules:
+
+GitHub Actions Workflows: Complete CI/CD pipeline configuration with multiple workflow files for different deployment stages and environments.
+
+Environment Management: Proper separation of development, staging, and production environments with secure secrets management.
+
+Build & Test Pipeline: Automated pipeline that runs unit tests, integration tests, linting, type checking, and security scans before deployment.
+
+Deployment Strategy: Zero-downtime deployment to production with rollback capabilities and health checks.
+
+Monitoring & Alerting: Production monitoring setup with error tracking, performance monitoring, and alerting for critical issues.
+
+Technical Challenges & Considerations:
+
+Multi-Environment Setup: Configuring separate Convex deployments for development, staging, and production with proper environment variable management.
+
+Environment Configuration:
+```yaml
+# Development
+VITE_CONVEX_URL: <development-deployment-url>
+VITE_APP_ENV: development
+
+# Staging  
+VITE_CONVEX_URL: <staging-deployment-url>
+VITE_APP_ENV: staging
+
+# Production
+VITE_CONVEX_URL: <production-deployment-url>
+VITE_APP_ENV: production
+VITE_OPENROUTER_API_KEY: <production-api-key>
+```
+
+Security & Secrets Management: Secure handling of production API keys, database credentials, and other sensitive configuration using GitHub Secrets and proper secret rotation strategies.
+
+Test Coverage Requirements: Ensuring the CI pipeline maintains high test coverage standards and fails builds that don't meet quality thresholds.
+
+Performance Optimization: Production build optimization including code splitting, asset compression, caching strategies, and CDN configuration.
+
+Database Migration Strategy: Automated database schema migrations and data seeding for production deployments while preserving existing data.
+
+Rollback & Recovery: Implementing quick rollback mechanisms for failed deployments and disaster recovery procedures.
+
+CI/CD Pipeline Structure:
+
+Primary Workflow (.github/workflows/ci.yml):
+```yaml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+      - name: Setup Node.js and pnpm
+      - name: Install dependencies
+      - name: Run type checking
+      - name: Run linting
+      - name: Run unit tests with coverage
+      - name: Run integration tests
+      - name: Upload coverage reports
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build application
+      - name: Run security audit
+      - name: Upload build artifacts
+
+  deploy-staging:
+    needs: [test, build]
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to staging
+      - name: Run smoke tests
+      - name: Notify team
+
+  deploy-production:
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to production
+      - name: Run health checks
+      - name: Update monitoring
+      - name: Notify stakeholders
+```
+
+TDD Testing Scenarios:
+
+CI Pipeline Testing:
+- Test that pipeline fails when unit tests fail
+- Test that pipeline fails when code coverage drops below threshold
+- Test that pipeline fails when linting errors are present
+- Test that builds fail with TypeScript errors
+- Test security audit failure handling
+
+Deployment Testing:
+- Test staging deployment from develop branch
+- Test production deployment from main branch
+- Test that environment variables are properly set for each environment
+- Test database migration execution during deployment
+- Test rollback procedures work correctly
+
+Environment Isolation Testing:
+- Test that staging and production use separate Convex deployments
+- Test that API keys and secrets are environment-specific
+- Test that cross-environment data leakage doesn't occur
+- Test that feature flags work correctly across environments
+
+Performance & Monitoring Testing:
+- Test that production builds meet performance budgets
+- Test that monitoring alerts trigger correctly
+- Test that error tracking captures and reports issues
+- Test that health checks detect application problems
+
+Implementation Steps:
+
+Step 1: Repository Setup & Basic CI
+- Configure GitHub repository settings and branch protection rules
+- Create basic CI workflow for running tests on pull requests
+- Set up pnpm caching and Node.js environment standardization
+- Configure automated dependency updates and security scanning
+
+Step 2: Testing & Quality Gates
+- Implement comprehensive test coverage reporting
+- Add code quality checks (ESLint, TypeScript, Biome)
+- Configure test coverage thresholds and quality gates
+- Set up automated security vulnerability scanning
+
+Step 3: Environment Management
+- Create separate Convex deployments for staging and production
+- Configure environment-specific variables and secrets
+- Implement environment promotion workflow (develop → staging → main → production)
+- Set up proper DNS and domain configuration for production
+
+Step 4: Production Deployment Pipeline
+- Create production deployment workflow with approval gates
+- Implement zero-downtime deployment strategy
+- Configure database migration automation
+- Set up deployment notifications and stakeholder communication
+
+Step 5: Monitoring & Maintenance
+- Implement error tracking and performance monitoring
+- Configure alerting for critical issues and downtime
+- Set up automated backup and recovery procedures
+- Create runbook documentation for common operational tasks
+- Implement log aggregation and analysis tools
