@@ -25,15 +25,17 @@ Date
 
 1. Introduction and Vision
 1.1. Vision
-To create a next-generation, browser-based mathematics platform that serves as a true educational co-pilot. This platform will leverage client-side processing for instant validation and a Large Language Model (LLM) to provide dynamic, personalized, and context-aware feedback, mimicking the Socratic dialogue of an expert human teacher.
+To create a next-generation, browser-based mathematics platform that serves as both an educational co-pilot for students and a powerful content creation tool for educators. This platform will leverage client-side processing for instant validation, a Large Language Model (LLM) for dynamic personalized feedback, and a robust database system that enables educators to create, share, and manage custom math problems. The result is a comprehensive ecosystem that mimics the Socratic dialogue of an expert human teacher while empowering educators to build rich, interactive learning experiences.
 
 1.2. Problem Statement
-Current digital math tools often fail students at their point of need. They typically validate only the final answer, marking a student's work as "Incorrect" without acknowledging valid intermediate steps or identifying the specific conceptual error. This leads to student frustration, hinders learning, and fails to provide teachers with actionable data on student comprehension. For teachers, creating assignments that offer dynamic, responsive feedback is technically prohibitive.
+Current digital math tools often fail both students and educators at their points of greatest need. For students, these tools typically validate only final answers, marking work as "Incorrect" without acknowledging valid intermediate steps or identifying specific conceptual errors. This leads to frustration and hinders learning. For educators, creating assignments with dynamic, responsive feedback is technically prohibitive, and existing problem libraries are limited and inflexible. Teachers need the ability to create custom problems that reflect their curriculum and teaching style, while students need guidance and partial credit that reflects their effort. The disconnect between what educators want to assign and what current tools can deliver creates a significant gap in digital math education.
 
 1.3. Target Audience & Personas
 Primary User: "Alex", a high school student (Grades 9-12). Alex is often frustrated when their answer is marked wrong without explanation, especially when they feel they've done most of the work correctly. They need guidance, not just a final judgment, and would benefit from partial credit that reflects their effort.
 
-Secondary User: "Ms. Davison", a high school math teacher. Ms. Davison wants to assign meaningful homework that reinforces her teaching, but lacks the time to give every student personalized feedback. She needs a tool that allows her to build rich, interactive problems that can guide students when she isn't available and provide her with insights into where her class is struggling.
+Secondary User: "Ms. Davison", a high school math teacher. Ms. Davison wants to assign meaningful homework that reinforces her teaching, but lacks the time to give every student personalized feedback. She needs a tool that allows her to build rich, interactive problems that can guide students when she isn't available and provide her with insights into where her class is struggling. Additionally, she wants to create custom problems that align with her specific curriculum and share effective problems with other educators.
+
+Tertiary User: "Dr. Rodriguez", a math department head. Dr. Rodriguez oversees curriculum alignment across multiple teachers and wants to ensure consistent, high-quality problem sets are available to all instructors. He needs a platform where teachers can collaborate on problem creation and share best practices through well-designed, tested math problems.
 
 2. Goals and Success Metrics
 Goal ID
@@ -56,15 +58,27 @@ Enhance Student Engagement: Make the process of learning math more interactive, 
 
 G-03
 
-Empower Teachers: Provide educators with a powerful tool to create high-quality, auto-grading assignments that offer pedagogical value.
+Empower Teachers with Content Creation: Provide educators with powerful tools to create, customize, and manage high-quality math problems that offer pedagogical value.
 
-- High adoption rate among teachers on the platform.<br>- High number of custom problems created with the step-by-step model.<br>- Teacher-reported time savings on grading.
+- High adoption rate among teachers using the problem creation tools.<br>- High number of custom problems created with complete solution paths.<br>- Teacher-reported time savings on content preparation.<br>- Positive feedback from educators on creation tool usability.
 
 G-04
+
+Foster Educational Community: Enable educators to discover, share, and collaborate on effective math problems.
+
+- High number of public problems shared by educators.<br>- Active usage of problem discovery and search features.<br>- Evidence of problem reuse and adaptation by different educators.<br>- Community engagement metrics (problem ratings, duplications).
+
+G-05
 
 Deliver High-Quality, AI-Generated Feedback: Ensure the LLM-provided feedback is accurate, helpful, and pedagogically sound.
 
 - Implementation of a student feedback mechanism (e.g., thumbs up/down on each piece of feedback) with a target >80% positive rating.<br>- Reduction in "hint abuse" (students clicking through hints without attempting steps), suggesting feedback is effective.<br>- Favourable qualitative reviews from teachers on the quality and safety of the AI feedback.
+
+G-06
+
+Ensure Platform Reliability and Performance: Maintain fast, reliable performance for both problem solving and content creation workflows.
+
+- Database operations complete within 500ms for 95% of requests.<br>- Problem creation workflow completion rate >90%.<br>- System uptime >99.5%.<br>- Successful data persistence for all created problems.
 
 3. System Architecture and Logic
 The application will be architected as a purely client-side single-page application (SPA) that runs in the user's browser. It will rely on a secure, minimal backend component solely for API key management.
@@ -147,14 +161,30 @@ SHOULD HAVE (High-Priority for V1.1)
 
 [F-12] Partial Credit Scoring: The system should calculate and display a score based on the number of valid steps completed.
 
+[F-13] Problem Creation Interface: Teachers MUST be able to create new math problems through a web interface, defining problem statements, solution steps, and metadata.
+
+[F-14] Database Integration: The application MUST integrate with Convex database to store and retrieve user-created problems.
+
+[F-15] Problem Library Management: Teachers MUST be able to browse, search, edit, and delete their created problems through a management interface.
+
+[F-16] Public Problem Discovery: Users MUST be able to browse and discover publicly available problems created by other educators.
+
+[F-17] Problem Metadata System: The system MUST support rich metadata for problems including difficulty levels, subject areas, grade levels, and tags.
+
 COULD HAVE (Future Releases)
-[F-13] Rich Text/Equation Editor: Implement a LaTeX or graphical equation editor (like MathQuill) for easier input by both students and teachers.
+[F-18] Rich Text/Equation Editor: Implement a LaTeX or graphical equation editor (like MathQuill) for easier input by both students and teachers.
 
-[F-14] Caching LLM Responses: To reduce costs, cache LLM responses for identical requests (e.g., the same common error on the same problem).
+[F-19] Caching LLM Responses: To reduce costs, cache LLM responses for identical requests (e.g., the same common error on the same problem).
 
-[F-15] Offline Mode: A mode where the core CAS validation works offline, with LLM feedback disabled until a connection is restored.
+[F-20] Offline Mode: A mode where the core CAS validation works offline, with LLM feedback disabled until a connection is restored.
 
-[F-16] Analytics Dashboard for Teachers: A dashboard showing class-wide performance on problems, highlighting common stumbling blocks and errors.
+[F-21] Problem Templates: Pre-built problem templates that teachers can customize for common problem types.
+
+[F-22] Problem Validation Testing: Tools for teachers to test their created problems before publishing to ensure solution steps are correct.
+
+[F-23] Usage Analytics: Basic analytics showing how often problems are attempted and completion rates.
+
+[F-24] Problem Categorization: Advanced categorization and filtering system for organizing large numbers of problems.
 
 5. Non-Functional Requirements
 [NF-01] Performance:

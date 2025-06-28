@@ -204,3 +204,126 @@ Mock a successful API response from OpenRouter. Assert that the FeedbackDisplay 
 Mock a network error (e.g., 401 Unauthorized, 429 Rate Limit Exceeded). Assert that the FeedbackDisplay shows a user-friendly error message.
 
 Assert that a loading indicator is shown while the mock API call is "in-flight".
+
+Phase 5: Question Creation & Database Integration
+Objective: To add a complete question creation system where educators can create, edit, and manage math problems stored in Convex, seamlessly integrating with the existing Interactive Math Tutor.
+
+Key Components/Modules:
+
+Convex Database Schema: Extended schema for storing math problems with comprehensive metadata and solution steps.
+
+ProblemCreator.tsx: A comprehensive form component for creating new math problems with step-by-step solution building.
+
+ProblemLibrary.tsx: A component for browsing, searching, and managing created problems.
+
+ProblemBrowser.tsx: A public gallery for discovering and selecting problems to solve.
+
+Convex Functions: Complete CRUD operations for problems with search and filtering capabilities.
+
+Technical Challenges & Considerations:
+
+Database Schema Design: Creating a flexible schema that supports current problem types while being extensible for future math topics.
+
+Problems Table Schema:
+```typescript
+problems: defineTable({
+  // Basic Problem Info
+  problemStatement: v.string(),
+  problemType: v.union(v.literal("SOLVE_EQUATION"), v.literal("SIMPLIFY_EXPRESSION")),
+  
+  // Solution Steps
+  solutionSteps: v.array(v.string()),
+  
+  // Metadata
+  title: v.optional(v.string()),
+  description: v.optional(v.string()),
+  difficulty: v.union(v.literal("Easy"), v.literal("Medium"), v.literal("Hard")),
+  subject: v.optional(v.string()),
+  gradeLevel: v.optional(v.string()),
+  
+  // Management
+  createdBy: v.optional(v.id("users")),
+  isPublic: v.boolean(),
+  tags: v.optional(v.array(v.string())),
+  
+  // Usage Analytics
+  timesAttempted: v.number(),
+  averageSteps: v.optional(v.number()),
+  successRate: v.optional(v.number()),
+}).index("problemType", ["problemType"])
+  .index("difficulty", ["difficulty"])
+  .index("isPublic", ["isPublic"])
+```
+
+Problem Attempts Table:
+```typescript
+problemAttempts: defineTable({
+  problemId: v.id("problems"),
+  userId: v.optional(v.id("users")),
+  completed: v.boolean(),
+  stepsCount: v.number(),
+  timeSpent: v.number(),
+  hintsUsed: v.number(),
+}).index("problemId", ["problemId"])
+```
+
+Form Validation & UX: Creating intuitive problem creation workflows with real-time validation and preview capabilities.
+
+Database Integration: Seamlessly transitioning from static problem library to dynamic database-driven problems without breaking existing functionality.
+
+Migration Strategy: Developing a migration path to seed the database with existing problems from the static library.
+
+TDD Testing Scenarios:
+
+Database Operations:
+- Test CRUD operations for problems (create, read, update, delete)
+- Test search and filtering queries
+- Test problem validation before saving
+
+Problem Creator Component:
+- Test form validation for required fields
+- Test step-by-step solution builder functionality
+- Test problem preview generation
+- Test save and edit workflows
+
+Problem Library Integration:
+- Test loading problems from database
+- Test search and filter functionality
+- Test problem selection and navigation to tutor
+
+Tutor Integration:
+- Test loading database problems in MathTutorApp
+- Test problem completion tracking
+- Test analytics data collection
+
+Implementation Steps:
+
+Step 1: Database Setup
+- Update Convex schema with problems and problemAttempts tables
+- Create seed data migration from existing static library
+- Write basic CRUD functions (createProblem, updateProblem, deleteProblem, getProblem, etc.)
+- Add search and filter query functions
+
+Step 2: Core Problem Creator
+- Build ProblemCreator component with form validation
+- Implement step-by-step solution builder with dynamic array inputs
+- Add problem preview functionality
+- Connect to Convex mutations for saving problems
+
+Step 3: Problem Library Integration
+- Create ProblemLibrary component with search and filtering
+- Implement problem management actions (edit, delete, duplicate, test)
+- Add ProblemBrowser component for public problem discovery
+- Connect to Convex queries for data loading
+
+Step 4: Tutor Integration
+- Update MathTutorApp to load problems from database
+- Modify routing to handle dynamic problem IDs
+- Add problem selection flow and navigation
+- Implement problem completion tracking
+
+Step 5: Enhanced Features
+- Add problem validation and testing capabilities
+- Implement usage analytics and tracking
+- Add problem categorization and tagging
+- Create problem duplication and templating features

@@ -210,3 +210,166 @@ Define an msw handler that returns an error status (e.g., 401 Unauthorized).
 Simulate an incorrect user input.
 
 Assert that a loading state appears, then is replaced by a user-friendly error message (e.g., "Sorry, I couldn't get feedback right now.").
+
+Phase 5: Question Creation & Database Integration Testing
+Testing Goal: To verify the complete question creation workflow, database integration with Convex, and seamless integration with the existing math tutor functionality. This phase ensures data persistence, CRUD operations, and user interface reliability for educators creating and managing math problems.
+
+Tools: Vitest, React Testing Library (RTL), Convex Testing Utilities
+
+Key Test Suites:
+
+convex/problems.test.ts (Database Function Tests)
+
+ProblemCreator.test.tsx (Component Tests)
+
+ProblemLibrary.test.tsx (Component Tests)
+
+App.integration.database.test.tsx (End-to-End Database Integration)
+
+Detailed Test Cases & Scenarios:
+
+Convex Database Functions Suite (convex/problems.test.ts):
+
+CRUD Operations:
+
+it('should create a new problem with valid data'): Call createProblem mutation with valid problem data and assert successful creation with returned document ID.
+
+it('should reject problem creation with invalid data'): Attempt to create a problem with missing required fields and assert appropriate validation errors.
+
+it('should retrieve a problem by ID'): Create a problem, then use getProblemById query to retrieve it and assert all fields match.
+
+it('should update an existing problem'): Create a problem, modify it using updateProblem mutation, and assert changes are persisted.
+
+it('should delete a problem'): Create a problem, delete it, and assert it no longer exists in queries.
+
+Query Operations:
+
+it('should filter problems by type'): Create problems of different types and assert getProblemsByType returns only matching problems.
+
+it('should filter problems by difficulty'): Create problems with different difficulty levels and test filtering functionality.
+
+it('should search problems by text'): Create problems with distinct titles/descriptions and test search functionality.
+
+it('should return only public problems for non-owners'): Test visibility rules for public vs private problems.
+
+Analytics Operations:
+
+it('should increment attempt count when problem is attempted'): Test incrementAttempts mutation updates timesAttempted field.
+
+it('should track problem completion statistics'): Test tracking of completion rates and average steps.
+
+ProblemCreator Component Suite (ProblemCreator.test.tsx):
+
+Form Validation:
+
+it('should require problem statement'): Submit form with empty problem statement and assert validation error appears.
+
+it('should require at least one solution step'): Submit form with empty solution steps and assert validation error.
+
+it('should validate problem type selection'): Test form validation for required problem type.
+
+it('should allow optional metadata fields'): Test that title, description, and other optional fields can be left empty.
+
+Step Builder Functionality:
+
+it('should allow adding new solution steps'): Click "Add Step" button and assert new input field appears.
+
+it('should allow removing solution steps'): Add multiple steps, remove one, and assert it's removed from the list.
+
+it('should allow reordering solution steps'): Test drag-and-drop or arrow button reordering of steps.
+
+it('should preserve step content during reordering'): Ensure step content doesn't get lost during reordering operations.
+
+Problem Preview:
+
+it('should show live preview of problem as user types'): Enter problem statement and assert preview updates in real-time.
+
+it('should display solution steps in preview'): Add solution steps and assert they appear correctly in preview.
+
+Save/Edit Workflow:
+
+it('should save new problem successfully'): Fill out form completely and assert successful save with redirect to problem library.
+
+it('should handle save errors gracefully'): Mock save failure and assert appropriate error message is displayed.
+
+it('should load existing problem for editing'): Test editing workflow by loading an existing problem and verifying all fields populate correctly.
+
+ProblemLibrary Component Suite (ProblemLibrary.test.tsx):
+
+Display and Navigation:
+
+it('should display list of problems with metadata'): Render component with mock problems and assert all are displayed with correct titles, types, and difficulty levels.
+
+it('should handle empty problem list'): Render with no problems and assert appropriate "no problems" message.
+
+it('should navigate to problem editor on edit click'): Click edit button and assert navigation to edit route with correct problem ID.
+
+it('should navigate to tutor when testing problem'): Click "Test Problem" button and assert navigation to tutor with problem loaded.
+
+Search and Filtering:
+
+it('should filter problems by search term'): Enter search term and assert only matching problems are displayed.
+
+it('should filter by problem type'): Select problem type filter and assert only matching problems shown.
+
+it('should filter by difficulty level'): Select difficulty filter and assert correct filtering behavior.
+
+it('should combine multiple filters'): Apply multiple filters simultaneously and assert correct results.
+
+Problem Management Actions:
+
+it('should delete problem with confirmation'): Click delete button, confirm in modal, and assert problem is removed.
+
+it('should duplicate problem'): Click duplicate button and assert new problem is created with copied content.
+
+it('should handle bulk actions'): Test selecting multiple problems and performing bulk operations.
+
+App Integration Suite (App.integration.database.test.tsx):
+
+Database-Driven Problem Loading:
+
+it('should load problem from database by ID'): Navigate to /problem/:id route and assert problem loads from database instead of static library.
+
+it('should handle invalid problem IDs gracefully'): Navigate to non-existent problem ID and assert appropriate error handling.
+
+it('should fall back to static library when database unavailable'): Mock database failure and assert fallback to static problems.
+
+Problem Selection Flow:
+
+it('should allow selecting problem from library'): Navigate to /library, click on a problem, and assert navigation to tutor with selected problem.
+
+it('should maintain problem context during solving'): Start solving a database problem and assert all tutor functionality works identically to static problems.
+
+Usage Tracking Integration:
+
+it('should track problem attempts'): Start solving a problem and assert attempt is recorded in database.
+
+it('should track completion status'): Complete a problem and assert completion is recorded with correct statistics.
+
+it('should track time spent on problems'): Solve problem over time and assert duration tracking works correctly.
+
+Routing and Navigation:
+
+it('should support all new routes'): Test navigation to /create, /library, /problem/:id, and /problem/:id/edit routes.
+
+it('should handle route parameters correctly'): Test dynamic route parameters are passed correctly to components.
+
+it('should maintain browser history'): Test back/forward navigation works correctly with new routes.
+
+Performance and Error Handling:
+
+it('should handle slow database queries'): Mock slow Convex queries and assert loading states are displayed appropriately.
+
+it('should recover from database errors'): Mock database errors and assert graceful error handling with user-friendly messages.
+
+it('should maintain application state during database operations'): Ensure UI state isn't lost during database operations.
+
+Mock Data and Test Utilities:
+
+Mock Problem Data Factory: Create utility functions to generate consistent test problem data with various configurations.
+
+Convex Test Helpers: Utilities for mocking Convex queries and mutations in tests.
+
+Component Test Helpers: Reusable helpers for rendering components with required providers and mock data.
+
+Integration Test Scenarios: End-to-end test scenarios that cover complete user workflows from problem creation to solving.
