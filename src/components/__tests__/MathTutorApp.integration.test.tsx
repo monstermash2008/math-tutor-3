@@ -34,8 +34,6 @@ describe('MathTutorApp - Phase 3 Integration Tests', () => {
     );
   };
 
-
-
     describe('UI Component Integration', () => {
     it('should render initial state correctly', () => {
       renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
@@ -47,7 +45,7 @@ describe('MathTutorApp - Phase 3 Integration Tests', () => {
       expect(screen.getByRole('button', { name: /check/i })).toBeInTheDocument();
     });
 
-    it('should show loading state when check button is clicked', () => {
+    it('should show loading state when check button is clicked', async () => {
       renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
 
       const input = screen.getByRole('textbox');
@@ -57,9 +55,15 @@ describe('MathTutorApp - Phase 3 Integration Tests', () => {
       fireEvent.change(input, { target: { value: '3x + 3 = 12' } });
       fireEvent.click(checkButton);
 
-      // Assert loading state appears immediately
-      expect(screen.getByText('Checking your answer...')).toBeInTheDocument();
-      expect(screen.getByLabelText('Loading')).toBeInTheDocument();
+      // Wait for async processing to complete and step to appear with feedback
+      await waitFor(
+        () => {
+          expect(screen.getByText('3x + 3 = 12')).toBeInTheDocument();
+          expect(screen.getByText('Getting feedback...')).toBeInTheDocument();
+          expect(screen.getByTitle('Loading spinner')).toBeInTheDocument();
+        },
+        { timeout: 2000 }
+      );
     });
   });
 
@@ -101,16 +105,18 @@ describe('MathTutorApp - Phase 3 Integration Tests', () => {
       fireEvent.change(input, { target: { value: '7x = 9' } });
       fireEvent.click(checkButton);
 
-      // Wait for error message to appear
+      // Wait for incorrect attempt to appear in the UI
       await waitFor(
         () => {
-          expect(screen.getByRole('heading', { name: 'Tutor Feedback' })).toBeInTheDocument();
+          expect(screen.getByText('Incorrect Attempt')).toBeInTheDocument();
+          expect(screen.getByText('7x = 9')).toBeInTheDocument();
+          expect(screen.getByText('Getting feedback...')).toBeInTheDocument();
         },
         { timeout: 2000 }
       );
 
-      // Assert error styling
-      expect(screen.getByLabelText('Error')).toBeInTheDocument();
+      // Assert the incorrect attempt is styled properly
+      expect(screen.getByTitle('Incorrect attempt')).toBeInTheDocument();
     }, 10000);
   });
 
@@ -125,16 +131,18 @@ describe('MathTutorApp - Phase 3 Integration Tests', () => {
       fireEvent.change(input, { target: { value: '3x ++ 5 = 12' } });
       fireEvent.click(checkButton);
 
-      // Wait for LLM feedback loading state (since no API key available in tests, mutation hangs)
+      // Wait for incorrect attempt to appear with loading feedback
       await waitFor(
         () => {
-          const feedbackElement = screen.getByRole('heading', { name: 'Tutor Feedback' }).parentElement;
-          expect(feedbackElement).toHaveTextContent('Getting feedback...');
+          expect(screen.getByText('Incorrect Attempt')).toBeInTheDocument();
+          expect(screen.getByText('3x ++ 5 = 12')).toBeInTheDocument();
+          expect(screen.getByText('Getting feedback...')).toBeInTheDocument();
         },
         { timeout: 2000 }
       );
 
-      expect(screen.getByLabelText('Error')).toBeInTheDocument();
+      // Assert the malformed input is treated as an incorrect attempt
+      expect(screen.getByTitle('Incorrect attempt')).toBeInTheDocument();
     }, 10000);
   });
 }); 

@@ -3,12 +3,28 @@ import type { ProblemModel, ValidationResult } from "./validation-engine";
 
 const MODEL_NAME = "anthropic/claude-sonnet-4";
 
+// Data structure for tracking feedback history
+export interface FeedbackEntry {
+	id: string;
+	stepIndex: number;
+	feedback: string;
+	timestamp: number;
+	order: number; // order within that step (1st attempt, 2nd attempt, etc.)
+	validationResult: ValidationResult;
+}
+
+export interface FeedbackHistory {
+	[stepIndex: number]: FeedbackEntry[];
+}
+
 export interface LLMFeedbackRequest {
 	problemStatement: string;
 	userHistory: string[];
 	studentInput: string;
 	validationResult: ValidationResult;
 	problemModel: ProblemModel;
+	feedbackHistory?: FeedbackHistory;
+	currentStepIndex: number;
 }
 
 export interface LLMFeedbackResponse {
@@ -17,7 +33,14 @@ export interface LLMFeedbackResponse {
 }
 
 /**
- * Constructs a pedagogically-focused prompt for the LLM based on validation results
+ * Gets previous feedback for the current step to provide context for progressive hints
+ */
+function getPreviousFeedbackForStep(feedbackHistory: FeedbackHistory, stepIndex: number): FeedbackEntry[] {
+	return feedbackHistory[stepIndex] || [];
+}
+
+/**
+ * Constructs a pedagogically-focused prompt for the LLM based on validation results and previous feedback
  */
 export function constructPrompt(request: LLMFeedbackRequest): string {
 	const {
@@ -26,57 +49,70 @@ export function constructPrompt(request: LLMFeedbackRequest): string {
 		studentInput,
 		validationResult,
 		problemModel,
+		feedbackHistory = {},
+		currentStepIndex,
 	} = request;
 
-	const baseContext = `
-You are a helpful math tutor working with a student on algebra problems. 
+	const previousFeedback = getPreviousFeedbackForStep(feedbackHistory, currentStepIndex);
+	const attemptNumber = previousFeedback.length + 1;
+	const isFirstAttempt = attemptNumber === 1;
 
-Problem: ${problemStatement}
-Previous correct steps: ${
+	const baseContext = `
+You are a math tutor. Problem: ${problemStatement}
+Previous steps: ${
 		userHistory
 			.slice(1)
 			.map((step, i) => `${i + 1}. ${step}`)
-			.join("\n") || "None yet"
+			.join("\n") || "None"
 	}
-Student's current input: ${studentInput}
-Validation result: ${validationResult}
-`;
+Student input: ${studentInput}
+Validation: ${validationResult}`;
+
+	// Add previous feedback context if this isn't the first attempt
+	const feedbackContext = !isFirstAttempt ? `
+
+Previous feedback given to student for this step:
+${previousFeedback.map((entry, i) => `Attempt ${i + 1}: ${entry.feedback}`).join('\n')}
+
+IMPORTANT: Don't repeat information already given. Provide new insight or be more specific.` : '';
+
+	const hintLevel = isFirstAttempt ? 'minimal' : attemptNumber === 2 ? 'moderate' : 'detailed';
 
 	switch (validationResult) {
 		case "CORRECT_FINAL_STEP":
-			return `${baseContext}
+			return `${baseContext}${feedbackContext}
 
-The student has successfully solved the problem! Provide enthusiastic congratulations and briefly explain why their final step is correct. Keep it encouraging and positive. Use 1-2 sentences maximum.`;
+Student solved the problem! Briefly confirm correctness. 1 sentence.`;
 
 		case "CORRECT_INTERMEDIATE_STEP":
-			return `${baseContext}
+			return `${baseContext}${feedbackContext}
 
-The student made a correct step forward! Provide encouraging feedback and briefly mention what good mathematical technique they used. Then give a gentle hint about what type of operation to consider next. Keep it supportive and pedagogical. Use 2-3 sentences maximum.`;
+Student made correct progress. Acknowledge briefly, then give a ${hintLevel} hint about the next step. ${hintLevel === 'detailed' ? 'You can be more specific about what operation to try.' : '1-2 sentences.'} `;
 
 		case "CORRECT_BUT_NOT_SIMPLIFIED":
-			return `${baseContext}
+			return `${baseContext}${feedbackContext}
 
-The student's answer is mathematically correct but not fully simplified. Acknowledge that they're right, then gently guide them to simplify further. Be encouraging while explaining why simplification is helpful. Use 2-3 sentences maximum.`;
+Student is correct but needs to simplify. ${isFirstAttempt ? 'Gently prompt to simplify further.' : 'Be more specific about what to simplify.'} 1-2 sentences.`;
 
 		case "VALID_BUT_NO_PROGRESS":
-			return `${baseContext}
+			return `${baseContext}${feedbackContext}
 
-The student's step is mathematically valid but doesn't move closer to solving the problem. Acknowledge the validity, then gently suggest a more productive approach or operation that would make progress. Be encouraging and specific. Use 2-3 sentences maximum.`;
+Student's step is valid but doesn't help solve the problem. ${hintLevel === 'minimal' ? 'Suggest a different approach.' : hintLevel === 'moderate' ? 'Suggest a specific operation that would help.' : 'Give a clear hint about what operation to try and why.'} 1-2 sentences.`;
 
 		case "EQUIVALENCE_FAILURE":
-			return `${baseContext}
+			return `${baseContext}${feedbackContext}
 
-The student made an error in their calculation. Provide gentle, constructive feedback that helps them identify what went wrong without giving away the answer. Focus on the mathematical concept or operation that needs attention. Be supportive and educational. Use 2-3 sentences maximum.`;
+Student made an error. ${hintLevel === 'minimal' ? 'Point out there\'s an error, ask them to check their work.' : hintLevel === 'moderate' ? 'Identify which part has the error without giving the answer.' : 'Explain what went wrong and hint at the correct approach.'} 1-2 sentences.`;
 
 		case "PARSING_ERROR":
-			return `${baseContext}
+			return `${baseContext}${feedbackContext}
       
-The student's input has a formatting issue. Help them understand how to write mathematical expressions clearly, with a specific example related to their input. Be patient and encouraging. Use 1-2 sentences maximum.`;
+Student's input has formatting issues. ${isFirstAttempt ? 'Explain how to format math expressions clearly.' : 'Give a specific example of correct formatting.'} 1 sentence.`;
 
 		default:
-			return `${baseContext}
+			return `${baseContext}${feedbackContext}
 
-Provide gentle, encouraging feedback to help the student continue working on this problem. Use 1-2 sentences maximum.`;
+Provide helpful guidance. 1 sentence.`;
 	}
 }
 

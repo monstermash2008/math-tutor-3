@@ -1,15 +1,14 @@
 import { useMutation } from '@tanstack/react-query';
-import { useReducer } from 'react';
-import type { LLMFeedbackRequest } from '../lib/llm-feedback-service';
-import { constructPrompt, llmFeedbackMutationFn } from '../lib/llm-feedback-service';
-import type { ProblemModel, ValidationContext } from '../lib/validation-engine';
-import { validateStep } from '../lib/validation-engine';
-import { FeedbackDisplay, type FeedbackStatus } from './FeedbackDisplay';
+import React, { useReducer } from 'react';
+import { type FeedbackEntry, type FeedbackHistory, type LLMFeedbackRequest, constructPrompt, llmFeedbackMutationFn } from '../lib/llm-feedback-service';
+import { type ProblemModel, type ValidationContext, type ValidationResult, validateStep } from '../lib/validation-engine';
 import { ProblemView } from './ProblemView';
 import { StepsHistory } from './StepsHistory';
 import { UserInput } from './UserInput';
 
-// Individual attempt interface
+export type FeedbackStatus = 'idle' | 'loading' | 'success' | 'error';
+
+// Individual attempt interface - keeping for backward compatibility
 interface StudentAttempt {
   input: string;
   isCorrect: boolean;
@@ -21,7 +20,8 @@ interface StudentAttempt {
 // Application state interface
 interface AppState {
   userHistory: string[]; // Only correct steps
-  allAttempts: StudentAttempt[]; // All attempts (correct and incorrect)
+  allAttempts: StudentAttempt[]; // All attempts (correct and incorrect) - for backward compatibility
+  feedbackHistory: FeedbackHistory; // New structured feedback history
   currentStatus: 'idle' | 'checking' | 'awaiting_next_step' | 'solved';
   feedbackStatus: FeedbackStatus;
   feedbackMessage: string;
@@ -34,10 +34,38 @@ type AppAction =
   | { type: 'CHECK_STEP_SUCCESS'; payload: { step: string; message: string; feedbackStatus: FeedbackStatus } }
   | { type: 'CHECK_STEP_ERROR'; payload: { step: string; message: string } }
   | { type: 'PROBLEM_SOLVED'; payload: { step: string; message: string } }
-  | { type: 'LLM_FEEDBACK_SUCCESS'; payload: { message: string; feedbackStatus: FeedbackStatus } }
+  | { type: 'LLM_FEEDBACK_SUCCESS'; payload: { message: string; feedbackStatus: FeedbackStatus; stepIndex: number; validationResult: string; studentInput: string; isCorrect: boolean } }
   | { type: 'LLM_FEEDBACK_ERROR'; payload: { message: string } }
   | { type: 'LLM_PROMPT_SENT'; payload: { prompt: string } }
   | { type: 'RESET_FEEDBACK' };
+
+// Utility function to generate unique feedback entry IDs
+function generateFeedbackId(): string {
+  return `feedback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Utility function to add feedback entry to history
+function addFeedbackToHistory(
+  history: FeedbackHistory,
+  stepIndex: number,
+  feedback: string,
+  validationResult: string
+): FeedbackHistory {
+  const currentStepFeedback = history[stepIndex] || [];
+  const newEntry: FeedbackEntry = {
+    id: generateFeedbackId(),
+    stepIndex,
+    feedback,
+    timestamp: Date.now(),
+    order: currentStepFeedback.length + 1,
+    validationResult: validationResult as ValidationResult
+  };
+
+  return {
+    ...history,
+    [stepIndex]: [...currentStepFeedback, newEntry]
+  };
+}
 
 // State reducer
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -73,7 +101,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       const errorAttempt: StudentAttempt = {
         input: action.payload.step,
         isCorrect: false,
-        feedback: action.payload.message,
+        feedback: action.payload.message, // This will be "Getting feedback..."
         timestamp: new Date(),
         stepNumber: state.userHistory.length
       };
@@ -82,7 +110,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         allAttempts: [...state.allAttempts, errorAttempt],
         currentStatus: 'awaiting_next_step',
-        feedbackStatus: 'error',
+        feedbackStatus: 'loading',
         feedbackMessage: action.payload.message
       };
     }
@@ -106,12 +134,41 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
 
-    case 'LLM_FEEDBACK_SUCCESS':
+    case 'LLM_FEEDBACK_SUCCESS': {
+      const updatedFeedbackHistory = addFeedbackToHistory(
+        state.feedbackHistory,
+        action.payload.stepIndex,
+        action.payload.message,
+        action.payload.validationResult
+      );
+
+      // Update the most recent StudentAttempt that's waiting for feedback
+      // Since LLM requests are made immediately after creating attempts,
+      // we can safely update the last attempt with "Getting feedback..."
+      const updatedAttempts = state.allAttempts.map((attempt, index) => {
+        // Find the most recent attempt with "Getting feedback..."
+        const isLastWaitingAttempt = attempt.feedback === 'Getting feedback...' &&
+          !state.allAttempts.slice(index + 1).some(laterAttempt => 
+            laterAttempt.feedback === 'Getting feedback...'
+          );
+        
+        if (isLastWaitingAttempt) {
+          return {
+            ...attempt,
+            feedback: action.payload.message
+          };
+        }
+        return attempt;
+      });
+
       return {
         ...state,
         feedbackStatus: action.payload.feedbackStatus,
-        feedbackMessage: action.payload.message
+        feedbackMessage: action.payload.message,
+        feedbackHistory: updatedFeedbackHistory,
+        allAttempts: updatedAttempts
       };
+    }
 
     case 'LLM_FEEDBACK_ERROR':
       return {
@@ -148,6 +205,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
   const initialState: AppState = {
     userHistory: [problem.problemStatement],
     allAttempts: [],
+    feedbackHistory: {},
     currentStatus: 'awaiting_next_step',
     feedbackStatus: 'idle',
     feedbackMessage: '',
@@ -159,13 +217,24 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
   // LLM feedback mutation
   const llmFeedbackMutation = useMutation({
     mutationFn: llmFeedbackMutationFn,
-    onSuccess: (response) => {
+    onSuccess: (response, variables) => {
       const feedbackStatus: FeedbackStatus = response.encouragement ? 'success' : 'success';
+      
+      // Determine if this is a correct step based on validation result
+      const isCorrect = variables.validationResult === 'CORRECT_FINAL_STEP' || 
+                       variables.validationResult === 'CORRECT_INTERMEDIATE_STEP' ||
+                       variables.validationResult === 'CORRECT_BUT_NOT_SIMPLIFIED' ||
+                       variables.validationResult === 'VALID_BUT_NO_PROGRESS';
+      
       dispatch({
         type: 'LLM_FEEDBACK_SUCCESS',
         payload: {
           message: response.feedback,
-          feedbackStatus
+          feedbackStatus,
+          stepIndex: variables.currentStepIndex,
+          validationResult: variables.validationResult,
+          studentInput: variables.studentInput,
+          isCorrect
         }
       });
     },
@@ -197,13 +266,22 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
         // Validate the step
         const result = validateStep(context);
         
-        // Prepare LLM feedback request
+        // Current step index is based on how many steps have been completed
+        // For correct steps, this will be the new step number
+        // For incorrect steps, this remains the current step number
+        const currentStepIndex = result.result === 'CORRECT_INTERMEDIATE_STEP' || result.result === 'CORRECT_FINAL_STEP' 
+          ? state.userHistory.length  // New step index for correct steps
+          : state.userHistory.length - 1; // Current step index for errors (subtract 1 because userHistory includes problem statement)
+
+        // Prepare LLM feedback request with feedback history
         const llmRequest: LLMFeedbackRequest = {
           problemStatement: problem.problemStatement,
           userHistory: state.userHistory,
           studentInput,
           validationResult: result.result,
-          problemModel: problem
+          problemModel: problem,
+          feedbackHistory: state.feedbackHistory,
+          currentStepIndex: Math.max(0, currentStepIndex) // Ensure non-negative
         };
 
         // Generate and store the prompt for debugging
@@ -286,6 +364,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
       <StepsHistory 
         history={state.userHistory} 
         allAttempts={state.allAttempts}
+        feedbackHistory={state.feedbackHistory}
         isSolved={isSolved} 
       />
 
@@ -294,13 +373,6 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
         onCheckStep={handleCheckStep}
         isSolved={isSolved}
         stepNumber={stepNumber}
-      />
-
-      {/* Feedback Display */}
-      <FeedbackDisplay 
-        status={state.feedbackStatus}
-        message={state.feedbackMessage}
-        prompt={state.currentPrompt}
       />
     </div>
   );
