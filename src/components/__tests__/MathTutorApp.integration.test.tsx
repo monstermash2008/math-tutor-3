@@ -78,10 +78,9 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 		it("should render initial state correctly", () => {
 			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
 
-			// Verify initial state
-			expect(
-				screen.getByText("Solve for x: 5x + 3 = 2x + 12"),
-			).toBeInTheDocument();
+					// Verify initial state - check for problem statement and input
+		expect(screen.getByText("Problem:")).toBeInTheDocument();
+		expect(screen.getAllByText("Solve for x: 5x + 3 = 2x + 12")).toHaveLength(2); // Problem statement + completed step
 			expect(screen.getByText("Step 1:")).toBeInTheDocument();
 			expect(screen.getByRole("textbox")).toBeInTheDocument();
 			expect(
@@ -145,15 +144,26 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			fireEvent.change(input, { target: { value: "7x = 9" } });
 			fireEvent.click(checkButton);
 
-			// Wait for incorrect attempt to appear in the UI with backend feedback
-			await waitFor(
-				() => {
-					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
-					expect(screen.getByText("7x = 9")).toBeInTheDocument();
-					expect(screen.getByText("This step is incorrect. Try again.")).toBeInTheDocument();
-				},
-				{ timeout: 1000 },
-			);
+					// Wait for incorrect attempt to appear in the UI with backend feedback
+		await waitFor(
+			() => {
+				expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+				expect(screen.getByText("7x = 9")).toBeInTheDocument();
+			},
+			{ timeout: 1000 },
+		);
+
+		// Click the expand button to show the feedback
+		const expandButton = screen.getByRole("button", { name: /show feedback for incorrect attempt/i });
+		fireEvent.click(expandButton);
+
+		// Now check for the feedback text
+		await waitFor(
+			() => {
+				expect(screen.getByText("This step is incorrect. Try again.")).toBeInTheDocument();
+			},
+			{ timeout: 500 },
+		);
 
 			// Assert the incorrect attempt is styled properly
 			expect(screen.getByTitle("Incorrect attempt")).toBeInTheDocument();
@@ -171,15 +181,26 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			fireEvent.change(input, { target: { value: "3x ++ 5 = 12" } });
 			fireEvent.click(checkButton);
 
-			// Wait for incorrect attempt to appear with backend feedback
-			await waitFor(
-				() => {
-					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
-					expect(screen.getByText("3x ++ 5 = 12")).toBeInTheDocument();
-					expect(screen.getByText("This step is incorrect. Try again.")).toBeInTheDocument();
-				},
-				{ timeout: 1000 },
-			);
+					// Wait for incorrect attempt to appear with backend feedback
+		await waitFor(
+			() => {
+				expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+				expect(screen.getByText("3x ++ 5 = 12")).toBeInTheDocument();
+			},
+			{ timeout: 1000 },
+		);
+
+		// Click the expand button to show the feedback
+		const expandButton = screen.getByRole("button", { name: /show feedback for incorrect attempt/i });
+		fireEvent.click(expandButton);
+
+		// Now check for the feedback text
+		await waitFor(
+			() => {
+				expect(screen.getByText("This step is incorrect. Try again.")).toBeInTheDocument();
+			},
+			{ timeout: 500 },
+		);
 
 			// Assert the malformed input is treated as an incorrect attempt
 			expect(screen.getByTitle("Incorrect attempt")).toBeInTheDocument();

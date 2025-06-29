@@ -112,6 +112,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
 				stepNumber: currentStepNumber,
 			};
 
+
+
 			return {
 				...state,
 				allAttempts: [...state.allAttempts, optimisticAttempt],

@@ -83,8 +83,8 @@ export function StepsHistory({
 		}
 	}, [allAttempts, history, isSolved]);
 
-	// Skip the first item (problem statement) and display the rest as steps
-	const steps = history.slice(1);
+	// history contains completed steps only (userHistory), no problem statement to skip
+	const steps = history;
 
 	if (steps.length === 0 && allAttempts.length === 0) {
 		return null;
@@ -125,9 +125,12 @@ export function StepsHistory({
 	);
 
 	// Check if there are attempts for the current step (not yet completed)
-	const currentStepNumber = steps.length + 1;
+	// history = userHistory (completed steps only), so current step = history.length + 1
+	const currentStepNumber = history.length + 1;
 	const currentStepAttempts = attemptsByStep[currentStepNumber] || [];
 	const hasCurrentStepAttempts = currentStepAttempts.length > 0;
+
+
 
 	return (
 		<div className="space-y-4 mb-6">
@@ -509,7 +512,7 @@ export function StepsHistory({
 			{/* Show any remaining incorrect attempts for the current step */}
 			{!isSolved &&
 				(() => {
-					const currentStepNumber = steps.length + 1; // Current step is the next step after completed ones
+					const currentStepNumber = history.length + 1; // Current step is the next step after completed ones
 					const currentStepAttempts = attemptsByStep[currentStepNumber] || [];
 					const incorrectAttempts = currentStepAttempts.filter(
 						(attempt) => !attempt.isCorrect,
