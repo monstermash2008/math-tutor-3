@@ -8,6 +8,7 @@ describe("StepsHistory Component", () => {
 		{
 			input: "4x - 12 - x + 5 = 14",
 			isCorrect: true,
+			status: "correct",
 			feedback: "Great job!",
 			timestamp: new Date("2024-01-01T10:00:00"),
 			stepNumber: 1,
@@ -15,6 +16,7 @@ describe("StepsHistory Component", () => {
 		{
 			input: "4x - 12 - x - 5 = 14",
 			isCorrect: false,
+			status: "incorrect",
 			feedback: "Check your arithmetic",
 			timestamp: new Date("2024-01-01T09:55:00"),
 			stepNumber: 1,
@@ -22,6 +24,7 @@ describe("StepsHistory Component", () => {
 		{
 			input: "3x - 7 = 14",
 			isCorrect: true,
+			status: "correct",
 			feedback: "Correct!",
 			timestamp: new Date("2024-01-01T10:05:00"),
 			stepNumber: 2,
@@ -231,6 +234,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "wrong1",
 				isCorrect: false,
+				status: "incorrect",
 				feedback: "Try again",
 				timestamp: new Date(),
 				stepNumber: 1,
@@ -238,6 +242,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "wrong2",
 				isCorrect: false,
+				status: "incorrect",
 				feedback: "Still wrong",
 				timestamp: new Date(),
 				stepNumber: 1,
@@ -245,6 +250,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "correct1",
 				isCorrect: true,
+				status: "correct",
 				feedback: "Good job",
 				timestamp: new Date(),
 				stepNumber: 1,
@@ -270,6 +276,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "wrong attempt",
 				isCorrect: false,
+				status: "incorrect",
 				feedback: "Not quite right",
 				timestamp: new Date(),
 				stepNumber: 2, // Next step after completed step 1
@@ -328,6 +335,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "4x - 12 - x + 5 = 14",
 				isCorrect: true,
+				status: "correct",
 				feedback: "Great job simplifying!",
 				timestamp: new Date("2024-01-01T10:00:00"),
 				stepNumber: 1,
@@ -336,6 +344,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "3x - 17 = 14", // Wrong arithmetic
 				isCorrect: false,
+				status: "incorrect",
 				feedback: "Check your arithmetic when combining like terms",
 				timestamp: new Date("2024-01-01T10:01:00"),
 				stepNumber: 2,
@@ -344,6 +353,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "3x + 7 = 14", // Still wrong
 				isCorrect: false,
+				status: "incorrect",
 				feedback: "Remember: -12 + 5 = -7, not +7",
 				timestamp: new Date("2024-01-01T10:02:00"),
 				stepNumber: 2,
@@ -352,6 +362,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "3x - 7 = 14",
 				isCorrect: true,
+				status: "correct",
 				feedback: "Perfect! Now you have the equation in standard form",
 				timestamp: new Date("2024-01-01T10:03:00"),
 				stepNumber: 2,
@@ -483,6 +494,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "4x - 12 - x - 5 = 14", // Wrong arithmetic
 				isCorrect: false,
+				status: "incorrect",
 				feedback: "Check your signs carefully",
 				timestamp: new Date("2024-01-01T09:59:00"),
 				stepNumber: 1,
@@ -490,6 +502,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "4x - 12 - x + 5 = 14",
 				isCorrect: true,
+				status: "correct",
 				feedback: "Great job!",
 				timestamp: new Date("2024-01-01T10:00:00"),
 				stepNumber: 1,
@@ -498,6 +511,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "3x - 17 = 14",
 				isCorrect: false,
+				status: "incorrect",
 				feedback: "Arithmetic error in combining terms",
 				timestamp: new Date("2024-01-01T10:01:00"),
 				stepNumber: 2,
@@ -505,6 +519,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "3x + 7 = 14",
 				isCorrect: false,
+				status: "incorrect",
 				feedback: "Still incorrect arithmetic",
 				timestamp: new Date("2024-01-01T10:02:00"),
 				stepNumber: 2,
@@ -512,6 +527,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "3x - 7 = 14",
 				isCorrect: true,
+				status: "correct",
 				feedback: "Perfect!",
 				timestamp: new Date("2024-01-01T10:03:00"),
 				stepNumber: 2,
@@ -574,6 +590,7 @@ describe("StepsHistory Component", () => {
 			{
 				input: "x = 21", // Incorrect attempt
 				isCorrect: false,
+				status: "incorrect",
 				feedback: "Remember to isolate x by adding 7 to both sides first",
 				timestamp: new Date("2024-01-01T10:01:00"),
 				stepNumber: 2, // Current step after completing step 1

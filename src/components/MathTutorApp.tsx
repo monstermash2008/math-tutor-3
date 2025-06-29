@@ -16,9 +16,10 @@ import { UserInput } from "./UserInput";
 export type FeedbackStatus = "idle" | "loading" | "success" | "error";
 
 // Individual attempt interface - keeping for backward compatibility
-interface StudentAttempt {
+export interface StudentAttempt {
 	input: string;
 	isCorrect: boolean;
+	status: "pending" | "correct" | "incorrect"; // Explicit status for UI rendering
 	feedback: string;
 	timestamp: Date;
 	stepNumber: number;
@@ -107,12 +108,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
 			const optimisticAttempt: StudentAttempt = {
 				input: action.payload.step,
 				isCorrect: false, // Will be updated when validation completes
+				status: "pending",
 				feedback: "Validating...", // Loading state feedback
 				timestamp: new Date(),
 				stepNumber: currentStepNumber,
 			};
 
-
+			console.log("🔄 Optimistic update created:", {
+				currentStepNumber,
+				optimisticAttempt,
+				feedback: optimisticAttempt.feedback,
+				isCorrect: optimisticAttempt.isCorrect
+			});
 
 			return {
 				...state,
@@ -133,6 +140,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 				updatedAttempts[lastAttemptIndex] = {
 					...lastAttempt,
 					isCorrect: true,
+					status: "correct",
 					feedback: action.payload.message,
 				};
 
@@ -160,6 +168,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 				updatedAttempts[lastAttemptIndex] = {
 					...updatedAttempts[lastAttemptIndex],
 					isCorrect: false,
+					status: "incorrect",
 					feedback: action.payload.message,
 				};
 			}
@@ -183,6 +192,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 				updatedAttempts[lastAttemptIndex] = {
 					...lastAttempt,
 					isCorrect: true,
+					status: "correct",
 					feedback: action.payload.message,
 				};
 
@@ -513,6 +523,3 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 		</div>
 	);
 }
-
-// Export the StudentAttempt type for use in other components
-export type { StudentAttempt };
