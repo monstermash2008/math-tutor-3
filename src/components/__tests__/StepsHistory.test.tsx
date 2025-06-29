@@ -208,8 +208,8 @@ describe("StepsHistory Component", () => {
 		fireEvent.click(expandButton);
 		expect(screen.getByText("Check your arithmetic")).toBeInTheDocument();
 
-		// But correct step feedback should be shown directly (for current step)
-		expect(screen.getByText("Great job!")).toBeInTheDocument();
+		// Correct step feedback is now also collapsed by default (no auto-expansion)
+		expect(screen.queryByText("Great job!")).not.toBeInTheDocument();
 	});
 
 	it("shows final answer with special styling when solved", () => {
@@ -285,18 +285,28 @@ describe("StepsHistory Component", () => {
 			/>,
 		);
 
-		expect(
-			screen.getByText("Previous attempts for current step:"),
-		).toBeInTheDocument();
+		// Check that the incorrect attempt is shown
 		expect(screen.getByText("wrong attempt")).toBeInTheDocument();
 
-		// Current step feedback should now be automatically expanded (NEW BEHAVIOR)
+		// Feedback should be collapsed by default
+		expect(screen.queryByText("Not quite right")).not.toBeInTheDocument();
+		expect(
+			screen.getByText("Feedback available - click to expand"),
+		).toBeInTheDocument();
+
+		// Click to expand feedback
+		const expandButton = screen.getByLabelText(
+			"Show feedback for incorrect attempt",
+		);
+		fireEvent.click(expandButton);
+
+		// Now the feedback should be visible
 		expect(screen.getByText("Not quite right")).toBeInTheDocument();
 		expect(
 			screen.queryByText("Feedback available - click to expand"),
 		).not.toBeInTheDocument();
 
-		// The button should show "Hide feedback" since it's expanded
+		// The button should now show "Hide feedback"
 		const collapseButton = screen.getByLabelText(
 			"Hide feedback for incorrect attempt",
 		);
@@ -304,7 +314,7 @@ describe("StepsHistory Component", () => {
 		// Click the collapse button to hide feedback
 		fireEvent.click(collapseButton);
 
-		// Now the feedback should be hidden
+		// Now the feedback should be hidden again
 		expect(screen.queryByText("Not quite right")).not.toBeInTheDocument();
 		expect(
 			screen.getByText("Feedback available - click to expand"),
@@ -393,10 +403,11 @@ describe("StepsHistory Component", () => {
 			screen.queryByText("Remember: -12 + 5 = -7, not +7"),
 		).not.toBeInTheDocument();
 
-		// Step 2 correct feedback should be shown directly since it's a completed step
+		// Step 2 correct feedback should NOT be shown directly since it's a completed step
+		// Only current step attempts show feedback directly
 		expect(
-			screen.getByText("Perfect! Now you have the equation in standard form"),
-		).toBeInTheDocument();
+			screen.queryByText("Perfect! Now you have the equation in standard form"),
+		).not.toBeInTheDocument();
 
 		// Test expanding the first incorrect attempt
 		const expandButtons = screen.getAllByLabelText(
@@ -455,19 +466,14 @@ describe("StepsHistory Component", () => {
 			screen.getAllByText("Feedback available - click to expand"),
 		).toHaveLength(1);
 
-		// Test that Step 1 feedback can be viewed via step accordion expansion
-		// Step 1 should have an expand button (it has feedback history)
-		const step1Container = screen.getByText("Step 1").closest(".bg-green-50");
-		expect(step1Container).toBeInTheDocument();
-
-		// There should be feedback history toggle button for Step 1 (though it might not be immediately visible in test)
-		// For now, let's test that Step 1 feedback is not visible by default but Step 2 feedback is
+		// Test that completed step feedback is not shown directly
+		// Only current step attempts show feedback directly, completed steps don't
 		expect(
 			screen.queryByText("Great job simplifying!"),
 		).not.toBeInTheDocument();
 		expect(
-			screen.getByText("Perfect! Now you have the equation in standard form"),
-		).toBeInTheDocument();
+			screen.queryByText("Perfect! Now you have the equation in standard form"),
+		).not.toBeInTheDocument();
 	});
 
 	it("should maintain independent accordion state for attempts across different steps", () => {
@@ -556,14 +562,14 @@ describe("StepsHistory Component", () => {
 			screen.getAllByText("Feedback available - click to expand"),
 		).toHaveLength(1);
 
-		// Verify that only the current step (Step 2) shows feedback directly
+		// Verify that completed step feedback is not shown directly
 		expect(screen.queryByText("Great job!")).not.toBeInTheDocument(); // Step 1 feedback is hidden
-		expect(screen.getByText("Perfect!")).toBeInTheDocument(); // Step 2 feedback is shown (current step)
+		expect(screen.queryByText("Perfect!")).not.toBeInTheDocument(); // Step 2 feedback is also hidden (completed step)
 	});
 
-	it("should automatically show feedback for new incorrect attempts without requiring accordion expansion", () => {
-		// Test the case where a student just received feedback on an incorrect attempt
-		// This feedback should be immediately visible, not hidden behind an accordion
+	it("should show feedback for current step attempts via accordion expansion", () => {
+		// Test the case where a student has incorrect attempts on the current step
+		// This feedback should be available via accordion expansion
 		const currentStepAttempts: StudentAttempt[] = [
 			{
 				input: "x = 21", // Incorrect attempt
@@ -589,23 +595,28 @@ describe("StepsHistory Component", () => {
 		);
 
 		// The incorrect attempt should be shown
-		expect(
-			screen.getByText("Previous attempts for current step:"),
-		).toBeInTheDocument();
 		expect(screen.getByText("x = 21")).toBeInTheDocument();
 
-		// The feedback should be immediately visible (not collapsed)
-		// This test will FAIL initially because current behavior hides feedback behind accordion
+		// The feedback should be collapsed by default (new behavior)
+		expect(
+			screen.queryByText("Remember to isolate x by adding 7 to both sides first"),
+		).not.toBeInTheDocument();
+
+		// There should be a "click to expand" message 
+		expect(
+			screen.getByText("Feedback available - click to expand"),
+		).toBeInTheDocument();
+
+		// Click to expand the feedback
+		const expandButton = screen.getByLabelText("Show feedback for incorrect attempt");
+		fireEvent.click(expandButton);
+
+		// Now the feedback should be visible
 		expect(
 			screen.getByText("Remember to isolate x by adding 7 to both sides first"),
 		).toBeInTheDocument();
 
-		// There should NOT be a "click to expand" message for fresh feedback
-		expect(
-			screen.queryByText("Feedback available - click to expand"),
-		).not.toBeInTheDocument();
-
-		// The accordion should show "Hide feedback" button since it's expanded
+		// The accordion should now show "Hide feedback" button since it's expanded
 		expect(
 			screen.getByLabelText("Hide feedback for incorrect attempt"),
 		).toBeInTheDocument();

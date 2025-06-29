@@ -80,7 +80,7 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 
 					// Verify initial state - check for problem statement and input
 		expect(screen.getByText("Problem:")).toBeInTheDocument();
-		expect(screen.getAllByText("Solve for x: 5x + 3 = 2x + 12")).toHaveLength(2); // Problem statement + completed step
+		expect(screen.getByText("Solve for x: 5x + 3 = 2x + 12")).toBeInTheDocument(); // Problem statement only
 			expect(screen.getByText("Step 1:")).toBeInTheDocument();
 			expect(screen.getByRole("textbox")).toBeInTheDocument();
 			expect(
@@ -98,15 +98,17 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			fireEvent.change(input, { target: { value: "3x + 3 = 12" } });
 			fireEvent.click(checkButton);
 
-			// Wait for backend validation to complete and step to appear with feedback
+			// Wait for backend validation to complete and step to appear
 			await waitFor(
 				() => {
 					expect(screen.getByText("3x + 3 = 12")).toBeInTheDocument();
-					expect(screen.getByText("Great job! That's the correct step.")).toBeInTheDocument();
 					expect(screen.getByText("Step 2:")).toBeInTheDocument(); // Should advance to next step
 				},
 				{ timeout: 1000 },
 			);
+
+			// Feedback is now collapsed by default for all steps
+			expect(screen.queryByText("Great job! That's the correct step.")).not.toBeInTheDocument();
 		});
 	});
 
@@ -125,11 +127,13 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			await waitFor(
 				() => {
 					expect(screen.getByText("3x + 3 = 12")).toBeInTheDocument();
-					expect(screen.getByText("Great job! That's the correct step.")).toBeInTheDocument();
 					expect(screen.getByText("Step 2:")).toBeInTheDocument();
 				},
 				{ timeout: 1000 },
 			);
+
+			// Feedback is now collapsed by default for all steps
+			expect(screen.queryByText("Great job! That's the correct step.")).not.toBeInTheDocument();
 		}, 2000);
 	});
 

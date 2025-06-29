@@ -103,7 +103,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 	switch (action.type) {
 		case "CHECK_STEP_START": {
 			// Optimistic update: immediately add step with loading feedback
-			const currentStepNumber = state.userHistory.length + 1; // Next step number (1-indexed)
+			const currentStepNumber = state.userHistory.length; // userHistory includes problem statement, so length = step number
 			const optimisticAttempt: StudentAttempt = {
 				input: action.payload.step,
 				isCorrect: false, // Will be updated when validation completes

@@ -18,31 +18,9 @@ export function StepsHistory({
 	// Track which step feedback sections are expanded
 	const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
 
-	// For current step attempts, automatically expand accordions that have feedback
-	// This ensures students see fresh feedback immediately without clicking
+	// Initialize with no expanded attempts - all feedback starts collapsed
 	const getInitialExpandedAttempts = () => {
-		const expanded = new Set<string>();
-		const steps = history.slice(1);
-
-		if (!isSolved) {
-			const currentStepNumber = steps.length + 1;
-			const currentStepAttempts = allAttempts.filter(
-				(attempt) =>
-					attempt.stepNumber === currentStepNumber && !attempt.isCorrect,
-			);
-
-			// Auto-expand current step attempts that have feedback
-			currentStepAttempts.forEach((attempt, attemptIndex) => {
-				if (attempt.feedback && 
-					attempt.feedback !== "Getting feedback..." && 
-					attempt.feedback !== "Validating...") {
-					const attemptId = `current-attempt-${attempt.timestamp.getTime()}-${attemptIndex}`;
-					expanded.add(attemptId);
-				}
-			});
-		}
-
-		return expanded;
+		return new Set<string>();
 	};
 
 	// Track which incorrect attempts have expanded feedback
@@ -50,41 +28,10 @@ export function StepsHistory({
 		getInitialExpandedAttempts(),
 	);
 
-	// Auto-expand new feedback for current step attempts
-	useEffect(() => {
-		const steps = history.slice(1);
+	// All feedback starts collapsed - no auto-expansion
 
-		if (!isSolved) {
-			const currentStepNumber = steps.length + 1;
-			const currentStepAttempts = allAttempts.filter(
-				(attempt) =>
-					attempt.stepNumber === currentStepNumber && !attempt.isCorrect,
-			);
-
-			// Find attempts with new feedback that should be auto-expanded
-			setExpandedAttempts((prevExpanded) => {
-				const newExpandedAttempts = new Set(prevExpanded);
-				let hasNewExpansions = false;
-
-				currentStepAttempts.forEach((attempt, attemptIndex) => {
-					if (attempt.feedback && 
-						attempt.feedback !== "Getting feedback..." && 
-						attempt.feedback !== "Validating...") {
-						const attemptId = `current-attempt-${attempt.timestamp.getTime()}-${attemptIndex}`;
-						if (!newExpandedAttempts.has(attemptId)) {
-							newExpandedAttempts.add(attemptId);
-							hasNewExpansions = true;
-						}
-					}
-				});
-
-				return hasNewExpansions ? newExpandedAttempts : prevExpanded;
-			});
-		}
-	}, [allAttempts, history, isSolved]);
-
-	// history contains completed steps only (userHistory), no problem statement to skip
-	const steps = history;
+	// Skip the first item (problem statement) and display the rest as steps
+	const steps = history.slice(1);
 
 	if (steps.length === 0 && allAttempts.length === 0) {
 		return null;
@@ -124,9 +71,8 @@ export function StepsHistory({
 		{} as Record<number, StudentAttempt[]>,
 	);
 
-	// Check if there are attempts for the current step (not yet completed)
-	// history = userHistory (completed steps only), so current step = history.length + 1
-	const currentStepNumber = history.length + 1;
+	// Check if there are attempts for the current step (not yet completed)  
+	const currentStepNumber = steps.length + 1;
 	const currentStepAttempts = attemptsByStep[currentStepNumber] || [];
 	const hasCurrentStepAttempts = currentStepAttempts.length > 0;
 
@@ -336,17 +282,7 @@ export function StepsHistory({
 										</p>
 									)}
 
-									{/* Show feedback directly within the correct step bubble - only for current step */}
-									{isCurrentStep &&
-										correctAttempt?.feedback &&
-										correctAttempt.feedback !== "Getting feedback..." &&
-										correctAttempt.feedback !== "Validating..." && (
-											<div className="mt-3 p-3 bg-green-100 rounded border border-green-300">
-												<p className="text-sm text-green-700">
-													{correctAttempt.feedback}
-												</p>
-											</div>
-										)}
+									{/* Feedback for current step is handled via accordion like other steps */}
 
 									{/* Show loading state - only for current step */}
 									{isCurrentStep &&
@@ -512,7 +448,7 @@ export function StepsHistory({
 			{/* Show any remaining incorrect attempts for the current step */}
 			{!isSolved &&
 				(() => {
-					const currentStepNumber = history.length + 1; // Current step is the next step after completed ones
+					const currentStepNumber = steps.length + 1; // Current step is the next step after completed ones
 					const currentStepAttempts = attemptsByStep[currentStepNumber] || [];
 					const incorrectAttempts = currentStepAttempts.filter(
 						(attempt) => !attempt.isCorrect,
