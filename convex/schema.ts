@@ -45,6 +45,27 @@ export default defineSchema({
     .index("userId", ["userId"])
     .index("sessionId", ["sessionId"]),
 
+  // Step attempts for detailed analytics
+  stepAttempts: defineTable({
+    problemId: v.id("problems"),
+    sessionId: v.optional(v.string()),
+    studentInput: v.string(),
+    validationResult: v.string(),
+    isCorrect: v.boolean(),
+    processingTimeMs: v.number(),
+    hintsUsed: v.number(),
+  }).index("problemId", ["problemId"])
+    .index("sessionId", ["sessionId"]),
+
+  // Hint requests tracking
+  hintRequests: defineTable({
+    problemId: v.id("problems"),
+    sessionId: v.optional(v.string()),
+    userHistoryLength: v.number(),
+    hintsProvided: v.array(v.string()),
+  }).index("problemId", ["problemId"])
+    .index("sessionId", ["sessionId"]),
+
   // Future: Users table for authentication
   users: defineTable({
     name: v.string(),

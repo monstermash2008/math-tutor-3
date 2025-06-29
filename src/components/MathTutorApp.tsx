@@ -1,25 +1,13 @@
 import { useMutation } from "@tanstack/react-query";
+import { useAction } from "convex/react";
 import { useReducer } from "react";
-import {
-	type FeedbackEntry,
-	type FeedbackHistory,
-	type LLMFeedbackRequest,
-	constructPrompt,
-	llmFeedbackMutationFn,
-} from "../lib/llm-feedback-service";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import type {
-	ProblemModel,
-	ValidationContext,
-	ValidationResult,
-} from "../lib/validation-engine";
-import {
-	analyzeStepOperation,
-	generateContextualHints,
-	getExpectedNextSteps,
-	getSimplificationSuggestions,
-	needsSimplification,
-	validateStep,
-} from "../lib/validation-engine";
+	FeedbackEntry,
+	FeedbackHistory,
+} from "../lib/llm-feedback-service";
+import type { ProblemModel, ValidationResult } from "../lib/validation-engine";
 import { FeedbackDisplay } from "./FeedbackDisplay";
 import { ProblemView } from "./ProblemView";
 import { StepsHistory } from "./StepsHistory";
@@ -308,159 +296,83 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 
 	const [state, dispatch] = useReducer(appReducer, initialState);
 
-	// LLM feedback mutation
-	const llmFeedbackMutation = useMutation({
-		mutationFn: llmFeedbackMutationFn,
-		onSuccess: (response, variables) => {
-			// Handle hint requests differently
-			if (variables.isHintRequest) {
-				dispatch({
-					type: "HINT_REQUEST_SUCCESS",
-					payload: { message: response.feedback },
-				});
-				return;
-			}
+	// Backend validation action
+	const validateStepAction = useAction(api.validation.validateStep);
 
-			const feedbackStatus: FeedbackStatus = response.encouragement
-				? "success"
-				: "success";
-
-			// Determine if this is a correct step based on validation result
-			const isCorrect =
-				variables.validationResult === "CORRECT_FINAL_STEP" ||
-				variables.validationResult === "CORRECT_INTERMEDIATE_STEP" ||
-				variables.validationResult === "CORRECT_BUT_NOT_SIMPLIFIED" ||
-				variables.validationResult === "VALID_BUT_NO_PROGRESS";
-
-			dispatch({
-				type: "LLM_FEEDBACK_SUCCESS",
-				payload: {
-					message: response.feedback,
-					feedbackStatus,
-					stepIndex: variables.currentStepIndex,
-					validationResult: variables.validationResult,
-					studentInput: variables.studentInput,
-					isCorrect,
-				},
-			});
-		},
-		onError: (error, variables) => {
-			if (variables.isHintRequest) {
-				dispatch({
-					type: "HINT_REQUEST_ERROR",
-					payload: {
-						message: "Unable to get hint right now. Please try again.",
-					},
-				});
-			} else {
-				dispatch({
-					type: "LLM_FEEDBACK_ERROR",
-					payload: {
-						message: "Unable to get feedback right now. Please try again.",
-					},
-				});
-			}
-			console.error("LLM feedback error:", error);
-		},
-	});
-
-	// Handle step validation with LLM integration
-	const handleCheckStep = (studentInput: string) => {
+	// Handle step validation using backend
+	const handleCheckStep = async (studentInput: string) => {
 		dispatch({ type: "CHECK_STEP_START" });
-		dispatch({ type: "RESET_FEEDBACK" }); // Clear any hint feedback when checking a new step
+		dispatch({ type: "RESET_FEEDBACK" });
 
 		try {
-			// Create validation context
-			const context: ValidationContext = {
-				problemModel: problem,
-				userHistory: state.userHistory,
+			// Call backend validation - no artificial delay needed!
+			// Natural network latency replaces setTimeout
+			const validationResponse = await validateStepAction({
+				problemId: problem._id as Id<"problems">, // Cast to Convex ID type
 				studentInput,
-			};
-
-			// Validate the step
-			const result = validateStep(context);
-
-			// Current step index is based on how many steps have been completed
-			// For correct steps, this will be the new step number
-			// For incorrect steps, this remains the current step number
-			const currentStepIndex =
-				result.result === "CORRECT_INTERMEDIATE_STEP" ||
-				result.result === "CORRECT_FINAL_STEP"
-					? state.userHistory.length // New step index for correct steps
-					: state.userHistory.length - 1; // Current step index for errors (subtract 1 because userHistory includes problem statement)
-
-			// Gather enhanced mathematical analysis (LLM Prompt 2.0)
-			const contextualHints = generateContextualHints(context);
-			const needsSimpl = needsSimplification(studentInput);
-			const simplificationSuggestions =
-				getSimplificationSuggestions(studentInput);
-
-			// Analyze step operation (only if we have previous steps)
-			let stepOperation = undefined;
-			if (state.userHistory.length > 1) {
-				const previousStep = state.userHistory[state.userHistory.length - 1];
-				stepOperation = analyzeStepOperation(previousStep, studentInput);
-			}
-
-			// Prepare enhanced LLM feedback request with mathematical context
-			const llmRequest: LLMFeedbackRequest = {
-				problemStatement: problem.problemStatement,
 				userHistory: state.userHistory,
-				studentInput,
-				validationResult: result.result,
-				problemModel: problem,
-				feedbackHistory: state.feedbackHistory,
-				currentStepIndex: Math.max(0, currentStepIndex), // Ensure non-negative
+				sessionId: `session_${Date.now()}`, // Optional session tracking
+			});
 
-				// Enhanced mathematical analysis fields (LLM Prompt 2.0)
-				contextualHints,
-				stepOperation,
-				needsSimplification: needsSimpl,
-				simplificationSuggestions,
-			};
+			const { result, isCorrect, shouldAdvance, feedback, processingTimeMs } =
+				validationResponse;
 
-			// Generate and store the prompt for debugging
-			const prompt = constructPrompt(llmRequest);
-			dispatch({ type: "LLM_PROMPT_SENT", payload: { prompt } });
+			// Current step index calculation
+			const currentStepIndex = isCorrect
+				? state.userHistory.length // New step index for correct steps
+				: state.userHistory.length - 1; // Current step index for errors
 
-			// Handle different validation results and trigger LLM feedback
-			switch (result.result) {
+			// Update feedback history
+			const updatedFeedbackHistory = addFeedbackToHistory(
+				state.feedbackHistory,
+				Math.max(0, currentStepIndex),
+				feedback,
+				result,
+			);
+
+			// Handle validation results
+			switch (result) {
 				case "CORRECT_FINAL_STEP":
 					dispatch({
 						type: "PROBLEM_SOLVED",
-						payload: { step: studentInput, message: "Problem completed!" },
+						payload: { step: studentInput, message: feedback },
 					});
-					llmFeedbackMutation.mutate(llmRequest);
-					return;
+					break;
 
 				case "CORRECT_INTERMEDIATE_STEP":
 				case "CORRECT_BUT_NOT_SIMPLIFIED":
-				case "VALID_BUT_NO_PROGRESS":
-					// For correct steps, update history first, then get LLM feedback
 					dispatch({
 						type: "CHECK_STEP_SUCCESS",
 						payload: {
 							step: studentInput,
-							message: "Getting feedback...",
-							feedbackStatus: "loading",
+							message: feedback,
+							feedbackStatus: "success",
 						},
 					});
-					llmFeedbackMutation.mutate(llmRequest);
+					break;
+
+				case "VALID_BUT_NO_PROGRESS":
+					// Valid but no progress - don't add to history but still provide feedback
+					dispatch({
+						type: "CHECK_STEP_ERROR",
+						payload: {
+							step: studentInput,
+							message: feedback,
+						},
+					});
 					break;
 
 				case "EQUIVALENCE_FAILURE":
 				case "PARSING_ERROR":
-					// For errors, don't update history but still get LLM feedback
 					dispatch({ type: "INCREMENT_FAILURES" });
 					dispatch({
 						type: "CHECK_STEP_ERROR",
 						payload: {
 							step: studentInput,
-							message: "Getting feedback...",
+							message: feedback,
 						},
 					});
-					llmFeedbackMutation.mutate(llmRequest);
-					return;
+					break;
 
 				default:
 					dispatch({
@@ -470,59 +382,42 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 							message: "Something unexpected happened. Please try again.",
 						},
 					});
-					return;
 			}
 
-			// For correct steps, the problem solved check is handled above
-			// LLM feedback will provide appropriate messaging
+			// Simulate LLM feedback success for compatibility with existing state management
+			dispatch({
+				type: "LLM_FEEDBACK_SUCCESS",
+				payload: {
+					message: feedback,
+					feedbackStatus: "success",
+					stepIndex: Math.max(0, currentStepIndex),
+					validationResult: result,
+					studentInput,
+					isCorrect,
+				},
+			});
+
+			// Optional: Log performance metrics
+			console.log(`Backend validation completed in ${processingTimeMs}ms`);
 		} catch (error) {
 			dispatch({
 				type: "CHECK_STEP_ERROR",
 				payload: {
 					step: studentInput,
 					message:
-						"An error occurred while checking your answer. Please try again.",
+						"Unable to validate your answer right now. Please try again.",
 				},
 			});
+			console.error("Backend validation error:", error);
 		}
 	};
 
-	// Handle hint request when student is stuck
+	// TODO: Implement hint functionality with backend
 	const handleHintRequest = () => {
-		dispatch({ type: "HINT_REQUEST_START" });
-
-		try {
-			// Create validation context
-			const context: ValidationContext = {
-				problemModel: problem,
-				userHistory: state.userHistory,
-				studentInput: "", // Empty for hint requests
-			};
-
-			// Get expected next steps
-			const expectedNextSteps = getExpectedNextSteps(context);
-
-			// Prepare LLM hint request
-			const hintRequest: LLMFeedbackRequest = {
-				problemStatement: problem.problemStatement,
-				userHistory: state.userHistory,
-				studentInput: "I need help with the next step",
-				validationResult: "EQUIVALENCE_FAILURE", // Not used for hints
-				problemModel: problem,
-				feedbackHistory: state.feedbackHistory,
-				currentStepIndex: Math.max(0, state.userHistory.length - 1),
-				isHintRequest: true,
-				expectedNextSteps,
-			};
-
-			// Send hint request to LLM
-			llmFeedbackMutation.mutate(hintRequest);
-		} catch (error) {
-			dispatch({
-				type: "HINT_REQUEST_ERROR",
-				payload: { message: "Unable to get hint right now. Please try again." },
-			});
-		}
+		dispatch({
+			type: "HINT_REQUEST_SUCCESS",
+			payload: { message: "Hint functionality will be available soon!" },
+		});
 	};
 
 	const isSolved = state.currentStatus === "solved";

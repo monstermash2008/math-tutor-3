@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -214,6 +214,14 @@ export const getProblemById = query({
     // }
     
     return problem;
+  },
+});
+
+// Internal query for actions to get problem by ID (no privacy restrictions)
+export const getProblemByIdInternal = internalQuery({
+  args: { id: v.id("problems") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
   },
 });
 
