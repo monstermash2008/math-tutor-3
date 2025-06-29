@@ -30,6 +30,7 @@ interface AppState {
   currentPrompt?: string; // For testing/debugging: shows the prompt sent to LLM
   consecutiveFailures: number; // Track consecutive incorrect attempts for current step
   isShowingHintFeedback: boolean; // Track if we're showing hint feedback (not regular step feedback)
+  hintRequestStatus: 'idle' | 'loading' | 'success' | 'error'; // Separate loading state for hint requests
 }
 
 // State actions
@@ -45,7 +46,8 @@ type AppAction =
   | { type: 'INCREMENT_FAILURES' }
   | { type: 'RESET_FAILURES' }
   | { type: 'HINT_REQUEST_START' }
-  | { type: 'HINT_REQUEST_SUCCESS'; payload: { message: string } };
+  | { type: 'HINT_REQUEST_SUCCESS'; payload: { message: string } }
+  | { type: 'HINT_REQUEST_ERROR'; payload: { message: string } };
 
 // Utility function to generate unique feedback entry IDs
 function generateFeedbackId(): string {
@@ -200,7 +202,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         feedbackStatus: 'idle',
         feedbackMessage: '',
         currentPrompt: undefined,
-        isShowingHintFeedback: false // Clear hint feedback display
+        isShowingHintFeedback: false, // Clear hint feedback display
+        hintRequestStatus: 'idle' // Reset hint request status
       };
     
     case 'INCREMENT_FAILURES':
@@ -218,6 +221,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'HINT_REQUEST_START':
       return {
         ...state,
+        hintRequestStatus: 'loading',
         feedbackStatus: 'loading',
         feedbackMessage: 'Getting hint...',
         isShowingHintFeedback: true // Show hint feedback in FeedbackDisplay
@@ -226,9 +230,19 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'HINT_REQUEST_SUCCESS':
       return {
         ...state,
+        hintRequestStatus: 'success',
         feedbackStatus: 'success',
         feedbackMessage: action.payload.message,
         isShowingHintFeedback: true // Keep showing hint feedback in FeedbackDisplay
+      };
+    
+    case 'HINT_REQUEST_ERROR':
+      return {
+        ...state,
+        hintRequestStatus: 'error',
+        feedbackStatus: 'error',
+        feedbackMessage: action.payload.message,
+        isShowingHintFeedback: true // Show error in FeedbackDisplay
       };
     
     default:
@@ -251,7 +265,8 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
     feedbackMessage: '',
     currentPrompt: undefined,
     consecutiveFailures: 0,
-    isShowingHintFeedback: false
+    isShowingHintFeedback: false,
+    hintRequestStatus: 'idle' // Initialize hint request status
   };
 
   const [state, dispatch] = useReducer(appReducer, initialState);
@@ -289,13 +304,22 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
         }
       });
     },
-    onError: (error) => {
-      dispatch({
-        type: 'LLM_FEEDBACK_ERROR',
-        payload: {
-          message: 'Unable to get feedback right now. Please try again.'
-        }
-      });
+    onError: (error, variables) => {
+      if (variables.isHintRequest) {
+        dispatch({
+          type: 'HINT_REQUEST_ERROR',
+          payload: {
+            message: 'Unable to get hint right now. Please try again.'
+          }
+        });
+      } else {
+        dispatch({
+          type: 'LLM_FEEDBACK_ERROR',
+          payload: {
+            message: 'Unable to get feedback right now. Please try again.'
+          }
+        });
+      }
       console.error('LLM feedback error:', error);
     }
   });
@@ -449,7 +473,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
       llmFeedbackMutation.mutate(hintRequest);
     } catch (error) {
       dispatch({
-        type: 'LLM_FEEDBACK_ERROR',
+        type: 'HINT_REQUEST_ERROR',
         payload: { message: 'Unable to get hint right now. Please try again.' }
       });
     }
@@ -500,10 +524,10 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
           <button
             type="button"
             onClick={handleHintRequest}
-            disabled={state.feedbackStatus === 'loading'}
+            disabled={state.hintRequestStatus === 'loading'}
             className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
           >
-            {state.feedbackStatus === 'loading' ? 'Getting hint...' : "I'm stuck! 💡"}
+            {state.hintRequestStatus === 'loading' ? 'Getting hint...' : "I'm stuck! 💡"}
           </button>
           <p className="text-sm text-gray-500 mt-2">
             Get a hint with the next step explained

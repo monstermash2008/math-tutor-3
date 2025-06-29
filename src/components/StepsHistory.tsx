@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FeedbackHistory } from "../lib/llm-feedback-service";
 import type { StudentAttempt } from "./MathTutorApp";
 
@@ -17,6 +17,63 @@ export function StepsHistory({
 }: StepsHistoryProps) {
 	// Track which step feedback sections are expanded
 	const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
+	
+	// For current step attempts, automatically expand accordions that have feedback
+	// This ensures students see fresh feedback immediately without clicking
+	const getInitialExpandedAttempts = () => {
+		const expanded = new Set<string>();
+		const steps = history.slice(1);
+		
+		if (!isSolved) {
+			const currentStepNumber = steps.length + 1;
+			const currentStepAttempts = allAttempts.filter(
+				(attempt) => attempt.stepNumber === currentStepNumber && !attempt.isCorrect
+			);
+			
+			// Auto-expand current step attempts that have feedback
+			currentStepAttempts.forEach((attempt, attemptIndex) => {
+				if (attempt.feedback && attempt.feedback !== 'Getting feedback...') {
+					const attemptId = `current-attempt-${attempt.timestamp.getTime()}-${attemptIndex}`;
+					expanded.add(attemptId);
+				}
+			});
+		}
+		
+		return expanded;
+	};
+	
+	// Track which incorrect attempts have expanded feedback
+	const [expandedAttempts, setExpandedAttempts] = useState<Set<string>>(getInitialExpandedAttempts());
+
+	// Auto-expand new feedback for current step attempts
+	useEffect(() => {
+		const steps = history.slice(1);
+		
+		if (!isSolved) {
+			const currentStepNumber = steps.length + 1;
+			const currentStepAttempts = allAttempts.filter(
+				(attempt) => attempt.stepNumber === currentStepNumber && !attempt.isCorrect
+			);
+			
+			// Find attempts with new feedback that should be auto-expanded
+			setExpandedAttempts(prevExpanded => {
+				const newExpandedAttempts = new Set(prevExpanded);
+				let hasNewExpansions = false;
+				
+				currentStepAttempts.forEach((attempt, attemptIndex) => {
+					if (attempt.feedback && attempt.feedback !== 'Getting feedback...') {
+						const attemptId = `current-attempt-${attempt.timestamp.getTime()}-${attemptIndex}`;
+						if (!newExpandedAttempts.has(attemptId)) {
+							newExpandedAttempts.add(attemptId);
+							hasNewExpansions = true;
+						}
+					}
+				});
+				
+				return hasNewExpansions ? newExpandedAttempts : prevExpanded;
+			});
+		}
+	}, [allAttempts, history, isSolved]);
 
 	// Skip the first item (problem statement) and display the rest as steps
 	const steps = history.slice(1);
@@ -34,6 +91,17 @@ export function StepsHistory({
 			newExpanded.add(stepIndex);
 		}
 		setExpandedSteps(newExpanded);
+	};
+
+	// Toggle feedback expansion for an incorrect attempt
+	const toggleAttemptFeedback = (attemptId: string) => {
+		const newExpanded = new Set(expandedAttempts);
+		if (newExpanded.has(attemptId)) {
+			newExpanded.delete(attemptId);
+		} else {
+			newExpanded.add(attemptId);
+		}
+		setExpandedAttempts(newExpanded);
 	};
 
 	// Group attempts by step number for better organization
@@ -85,42 +153,93 @@ export function StepsHistory({
 						{/* Show incorrect attempts for this step first */}
 						{stepAttempts
 							.filter((attempt) => !attempt.isCorrect)
-							.map((attempt, attemptIndex) => (
-								<div
-									key={`attempt-${stepNumber}-${attempt.timestamp.getTime()}-${attemptIndex}`}
-									className="flex items-start bg-red-50 p-3 rounded-lg border border-red-200"
-								>
-									<svg
-										className="w-5 h-5 text-red-500 mr-3 flex-shrink-0 mt-0.5"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-										aria-label="Incorrect attempt"
+							.map((attempt, attemptIndex) => {
+								const attemptId = `attempt-${stepNumber}-${attempt.timestamp.getTime()}-${attemptIndex}`;
+								const hasFeedback = attempt.feedback && attempt.feedback !== 'Getting feedback...';
+								const isAttemptExpanded = expandedAttempts.has(attemptId);
+								
+								return (
+									<div
+										key={attemptId}
+										className="bg-red-50 p-3 rounded-lg border border-red-200"
 									>
-										<title>Incorrect attempt</title>
-										<path
-											strokeLinecap="round"
-											strokeLinejoin="round"
-											strokeWidth="2"
-											d="M6 18L18 6M6 6l12 12"
-										/>
-									</svg>
-									<div className="flex-1">
-										<p className="text-sm font-medium text-red-700">
-											Incorrect Attempt
-										</p>
-										<p className="font-mono text-gray-800 mb-1">
-											{attempt.input}
-										</p>
-										{/* Show feedback directly in the attempt bubble - only for current step and only if no correct step feedback */}
-										{attempt.feedback && isCurrentStep && !(correctAttempt?.feedback && correctAttempt.feedback !== 'Getting feedback...') && (
-											<p className="text-sm text-red-600 mt-2 p-2 bg-red-100 rounded border">
-												{attempt.feedback}
-											</p>
-										)}
+										<div className="flex items-start">
+											<svg
+												className="w-5 h-5 text-red-500 mr-3 flex-shrink-0 mt-0.5"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+												aria-label="Incorrect attempt"
+											>
+												<title>Incorrect attempt</title>
+												<path
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													strokeWidth="2"
+													d="M6 18L18 6M6 6l12 12"
+												/>
+											</svg>
+											<div className="flex-1">
+												<p className="text-sm font-medium text-red-700">
+													Incorrect Attempt
+												</p>
+												<p className="font-mono text-gray-800 mb-1">
+													{attempt.input}
+												</p>
+												
+												{/* Show loading state for current step */}
+												{attempt.feedback === 'Getting feedback...' && isCurrentStep && (
+													<p className="text-sm text-red-600 mt-2 p-2 bg-red-100 rounded border">
+														{attempt.feedback}
+													</p>
+												)}
+												
+												{/* Show feedback in accordion format for attempts with feedback */}
+												{hasFeedback && (
+													<div className="mt-2">
+														{isAttemptExpanded ? (
+															<div className="p-2 bg-red-100 rounded border">
+																<p className="text-sm text-red-600">
+																	{attempt.feedback}
+																</p>
+															</div>
+														) : (
+															<div className="text-xs text-red-500">
+																Feedback available - click to expand
+															</div>
+														)}
+													</div>
+												)}
+											</div>
+											
+											{/* Toggle button for feedback - only show if there's feedback */}
+											{hasFeedback && (
+												<button
+													type="button"
+													onClick={() => toggleAttemptFeedback(attemptId)}
+													className="ml-2 p-1 text-red-400 hover:text-red-600 transition-colors"
+													aria-label={`${isAttemptExpanded ? 'Hide' : 'Show'} feedback for incorrect attempt`}
+												>
+													<svg
+														className={`w-4 h-4 transform transition-transform ${isAttemptExpanded ? 'rotate-180' : ''}`}
+														fill="none"
+														stroke="currentColor"
+														viewBox="0 0 24 24"
+													>
+														<title>{`${isAttemptExpanded ? 'Hide' : 'Show'} feedback`}</title>
+														<path
+															strokeLinecap="round"
+															strokeLinejoin="round"
+															strokeWidth="2"
+															d="M19 9l-7 7-7-7"
+														/>
+													</svg>
+												</button>
+											)}
+										</div>
 									</div>
-								</div>
-							))}
+								);
+							})}
 
 						{/* Show the correct step */}
 						<div className={containerClass}>
@@ -314,42 +433,93 @@ export function StepsHistory({
 							<p className="text-sm font-medium text-gray-600 mb-2">
 								Previous attempts for current step:
 							</p>
-							{incorrectAttempts.map((attempt, attemptIndex) => (
-								<div
-									key={`current-attempt-${attempt.timestamp.getTime()}-${attemptIndex}`}
-									className="flex items-start bg-red-50 p-3 rounded-lg border border-red-200"
-								>
-									<svg
-										className="w-5 h-5 text-red-500 mr-3 flex-shrink-0 mt-0.5"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-										aria-label="Incorrect attempt"
+							{incorrectAttempts.map((attempt, attemptIndex) => {
+								const attemptId = `current-attempt-${attempt.timestamp.getTime()}-${attemptIndex}`;
+								const hasFeedback = attempt.feedback && attempt.feedback !== 'Getting feedback...';
+								const isAttemptExpanded = expandedAttempts.has(attemptId);
+								
+								return (
+									<div
+										key={attemptId}
+										className="bg-red-50 p-3 rounded-lg border border-red-200"
 									>
-										<title>Incorrect attempt</title>
-										<path
-											strokeLinecap="round"
-											strokeLinejoin="round"
-											strokeWidth="2"
-											d="M6 18L18 6M6 6l12 12"
-										/>
-									</svg>
-									<div className="flex-1">
-										<p className="text-sm font-medium text-red-700">
-											Incorrect Attempt
-										</p>
-										<p className="font-mono text-gray-800 mb-1">
-											{attempt.input}
-										</p>
-										{/* Show feedback directly in the attempt bubble */}
-										{attempt.feedback && (
-											<p className="text-sm text-red-600 mt-2 p-2 bg-red-100 rounded border">
-												{attempt.feedback}
-											</p>
-										)}
+										<div className="flex items-start">
+											<svg
+												className="w-5 h-5 text-red-500 mr-3 flex-shrink-0 mt-0.5"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+												aria-label="Incorrect attempt"
+											>
+												<title>Incorrect attempt</title>
+												<path
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													strokeWidth="2"
+													d="M6 18L18 6M6 6l12 12"
+												/>
+											</svg>
+											<div className="flex-1">
+												<p className="text-sm font-medium text-red-700">
+													Incorrect Attempt
+												</p>
+												<p className="font-mono text-gray-800 mb-1">
+													{attempt.input}
+												</p>
+												
+												{/* Show loading state */}
+												{attempt.feedback === 'Getting feedback...' && (
+													<p className="text-sm text-red-600 mt-2 p-2 bg-red-100 rounded border">
+														{attempt.feedback}
+													</p>
+												)}
+												
+												{/* Show feedback in accordion format for attempts with feedback */}
+												{hasFeedback && (
+													<div className="mt-2">
+														{isAttemptExpanded ? (
+															<div className="p-2 bg-red-100 rounded border">
+																<p className="text-sm text-red-600">
+																	{attempt.feedback}
+																</p>
+															</div>
+														) : (
+															<div className="text-xs text-red-500">
+																Feedback available - click to expand
+															</div>
+														)}
+													</div>
+												)}
+											</div>
+											
+											{/* Toggle button for feedback - only show if there's feedback */}
+											{hasFeedback && (
+												<button
+													type="button"
+													onClick={() => toggleAttemptFeedback(attemptId)}
+													className="ml-2 p-1 text-red-400 hover:text-red-600 transition-colors"
+													aria-label={`${isAttemptExpanded ? 'Hide' : 'Show'} feedback for incorrect attempt`}
+												>
+													<svg
+														className={`w-4 h-4 transform transition-transform ${isAttemptExpanded ? 'rotate-180' : ''}`}
+														fill="none"
+														stroke="currentColor"
+														viewBox="0 0 24 24"
+													>
+														<title>{`${isAttemptExpanded ? 'Hide' : 'Show'} feedback`}</title>
+														<path
+															strokeLinecap="round"
+															strokeLinejoin="round"
+															strokeWidth="2"
+															d="M19 9l-7 7-7-7"
+														/>
+													</svg>
+												</button>
+											)}
+										</div>
 									</div>
-								</div>
-							))}
+								);
+							})}
 						</div>
 					);
 				})()}
