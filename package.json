@@ -12,6 +12,7 @@
     "test:coverage:watch": "vitest --coverage --watch",
     "test:coverage:ui": "vitest --coverage --ui",
     "coverage:open": "open coverage/index.html",
+    "fix": "biome check --write",
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",

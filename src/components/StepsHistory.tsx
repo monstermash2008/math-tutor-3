@@ -17,51 +17,55 @@ export function StepsHistory({
 }: StepsHistoryProps) {
 	// Track which step feedback sections are expanded
 	const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
-	
+
 	// For current step attempts, automatically expand accordions that have feedback
 	// This ensures students see fresh feedback immediately without clicking
 	const getInitialExpandedAttempts = () => {
 		const expanded = new Set<string>();
 		const steps = history.slice(1);
-		
+
 		if (!isSolved) {
 			const currentStepNumber = steps.length + 1;
 			const currentStepAttempts = allAttempts.filter(
-				(attempt) => attempt.stepNumber === currentStepNumber && !attempt.isCorrect
+				(attempt) =>
+					attempt.stepNumber === currentStepNumber && !attempt.isCorrect,
 			);
-			
+
 			// Auto-expand current step attempts that have feedback
 			currentStepAttempts.forEach((attempt, attemptIndex) => {
-				if (attempt.feedback && attempt.feedback !== 'Getting feedback...') {
+				if (attempt.feedback && attempt.feedback !== "Getting feedback...") {
 					const attemptId = `current-attempt-${attempt.timestamp.getTime()}-${attemptIndex}`;
 					expanded.add(attemptId);
 				}
 			});
 		}
-		
+
 		return expanded;
 	};
-	
+
 	// Track which incorrect attempts have expanded feedback
-	const [expandedAttempts, setExpandedAttempts] = useState<Set<string>>(getInitialExpandedAttempts());
+	const [expandedAttempts, setExpandedAttempts] = useState<Set<string>>(
+		getInitialExpandedAttempts(),
+	);
 
 	// Auto-expand new feedback for current step attempts
 	useEffect(() => {
 		const steps = history.slice(1);
-		
+
 		if (!isSolved) {
 			const currentStepNumber = steps.length + 1;
 			const currentStepAttempts = allAttempts.filter(
-				(attempt) => attempt.stepNumber === currentStepNumber && !attempt.isCorrect
+				(attempt) =>
+					attempt.stepNumber === currentStepNumber && !attempt.isCorrect,
 			);
-			
+
 			// Find attempts with new feedback that should be auto-expanded
-			setExpandedAttempts(prevExpanded => {
+			setExpandedAttempts((prevExpanded) => {
 				const newExpandedAttempts = new Set(prevExpanded);
 				let hasNewExpansions = false;
-				
+
 				currentStepAttempts.forEach((attempt, attemptIndex) => {
-					if (attempt.feedback && attempt.feedback !== 'Getting feedback...') {
+					if (attempt.feedback && attempt.feedback !== "Getting feedback...") {
 						const attemptId = `current-attempt-${attempt.timestamp.getTime()}-${attemptIndex}`;
 						if (!newExpandedAttempts.has(attemptId)) {
 							newExpandedAttempts.add(attemptId);
@@ -69,7 +73,7 @@ export function StepsHistory({
 						}
 					}
 				});
-				
+
 				return hasNewExpansions ? newExpandedAttempts : prevExpanded;
 			});
 		}
@@ -143,7 +147,9 @@ export function StepsHistory({
 				const stepLabel = isFinalAnswer ? "Final Answer" : `Step ${stepNumber}`;
 
 				// Find the correct attempt for this step to show its feedback
-				const correctAttempt = stepAttempts.find(attempt => attempt.isCorrect);
+				const correctAttempt = stepAttempts.find(
+					(attempt) => attempt.isCorrect,
+				);
 
 				return (
 					<div
@@ -155,9 +161,11 @@ export function StepsHistory({
 							.filter((attempt) => !attempt.isCorrect)
 							.map((attempt, attemptIndex) => {
 								const attemptId = `attempt-${stepNumber}-${attempt.timestamp.getTime()}-${attemptIndex}`;
-								const hasFeedback = attempt.feedback && attempt.feedback !== 'Getting feedback...';
+								const hasFeedback =
+									attempt.feedback &&
+									attempt.feedback !== "Getting feedback...";
 								const isAttemptExpanded = expandedAttempts.has(attemptId);
-								
+
 								return (
 									<div
 										key={attemptId}
@@ -186,14 +194,15 @@ export function StepsHistory({
 												<p className="font-mono text-gray-800 mb-1">
 													{attempt.input}
 												</p>
-												
+
 												{/* Show loading state for current step */}
-												{attempt.feedback === 'Getting feedback...' && isCurrentStep && (
-													<p className="text-sm text-red-600 mt-2 p-2 bg-red-100 rounded border">
-														{attempt.feedback}
-													</p>
-												)}
-												
+												{attempt.feedback === "Getting feedback..." &&
+													isCurrentStep && (
+														<p className="text-sm text-red-600 mt-2 p-2 bg-red-100 rounded border">
+															{attempt.feedback}
+														</p>
+													)}
+
 												{/* Show feedback in accordion format for attempts with feedback */}
 												{hasFeedback && (
 													<div className="mt-2">
@@ -211,22 +220,22 @@ export function StepsHistory({
 													</div>
 												)}
 											</div>
-											
+
 											{/* Toggle button for feedback - only show if there's feedback */}
 											{hasFeedback && (
 												<button
 													type="button"
 													onClick={() => toggleAttemptFeedback(attemptId)}
 													className="ml-2 p-1 text-red-400 hover:text-red-600 transition-colors"
-													aria-label={`${isAttemptExpanded ? 'Hide' : 'Show'} feedback for incorrect attempt`}
+													aria-label={`${isAttemptExpanded ? "Hide" : "Show"} feedback for incorrect attempt`}
 												>
 													<svg
-														className={`w-4 h-4 transform transition-transform ${isAttemptExpanded ? 'rotate-180' : ''}`}
+														className={`w-4 h-4 transform transition-transform ${isAttemptExpanded ? "rotate-180" : ""}`}
 														fill="none"
 														stroke="currentColor"
 														viewBox="0 0 24 24"
 													>
-														<title>{`${isAttemptExpanded ? 'Hide' : 'Show'} feedback`}</title>
+														<title>{`${isAttemptExpanded ? "Hide" : "Show"} feedback`}</title>
 														<path
 															strokeLinecap="round"
 															strokeLinejoin="round"
@@ -291,46 +300,65 @@ export function StepsHistory({
 											🎉 Excellent work!
 										</p>
 									)}
-									
+
 									{/* Show feedback directly within the correct step bubble - only for current step */}
-									{isCurrentStep && correctAttempt?.feedback && correctAttempt.feedback !== 'Getting feedback...' && (
-										<div className="mt-3 p-3 bg-green-100 rounded border border-green-300">
-											<p className="text-sm text-green-700">
-												{correctAttempt.feedback}
-											</p>
-										</div>
-									)}
-									
+									{isCurrentStep &&
+										correctAttempt?.feedback &&
+										correctAttempt.feedback !== "Getting feedback..." && (
+											<div className="mt-3 p-3 bg-green-100 rounded border border-green-300">
+												<p className="text-sm text-green-700">
+													{correctAttempt.feedback}
+												</p>
+											</div>
+										)}
+
 									{/* Show loading state - only for current step */}
-									{isCurrentStep && correctAttempt?.feedback === 'Getting feedback...' && (
-										<div className="mt-3 p-3 bg-gray-100 rounded border border-gray-300">
-											<p className="text-sm text-gray-600 flex items-center">
-												<svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-													<title>Loading spinner</title>
-													<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-													<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-												</svg>
-												Getting feedback...
-											</p>
-										</div>
-									)}
+									{isCurrentStep &&
+										correctAttempt?.feedback === "Getting feedback..." && (
+											<div className="mt-3 p-3 bg-gray-100 rounded border border-gray-300">
+												<p className="text-sm text-gray-600 flex items-center">
+													<svg
+														className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-600"
+														xmlns="http://www.w3.org/2000/svg"
+														fill="none"
+														viewBox="0 0 24 24"
+													>
+														<title>Loading spinner</title>
+														<circle
+															className="opacity-25"
+															cx="12"
+															cy="12"
+															r="10"
+															stroke="currentColor"
+															strokeWidth="4"
+														/>
+														<path
+															className="opacity-75"
+															fill="currentColor"
+															d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+														/>
+													</svg>
+													Getting feedback...
+												</p>
+											</div>
+										)}
 								</div>
-								
+
 								{/* Feedback history toggle button - show for any feedback on previous steps, or multiple feedback on current step */}
 								{hasFeedback && (!isCurrentStep || stepFeedback.length > 1) && (
 									<button
 										type="button"
 										onClick={() => toggleStepFeedback(stepNumber)}
 										className="ml-2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-										aria-label={`${isExpanded ? 'Hide' : 'Show'} feedback history for step ${stepNumber}`}
+										aria-label={`${isExpanded ? "Hide" : "Show"} feedback history for step ${stepNumber}`}
 									>
 										<svg
-											className={`w-5 h-5 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+											className={`w-5 h-5 transform transition-transform ${isExpanded ? "rotate-180" : ""}`}
 											fill="none"
 											stroke="currentColor"
 											viewBox="0 0 24 24"
 										>
-											<title>{`${isExpanded ? 'Hide' : 'Show'} feedback history`}</title>
+											<title>{`${isExpanded ? "Hide" : "Show"} feedback history`}</title>
 											<path
 												strokeLinecap="round"
 												strokeLinejoin="round"
@@ -346,69 +374,96 @@ export function StepsHistory({
 							{(hasFeedback || stepAttempts.length > 0) && isExpanded && (
 								<div className="mt-3 pt-3 border-t border-gray-200">
 									<p className="text-sm font-medium text-gray-600 mb-2">
-										{isCurrentStep ? 'Previous feedback:' : 'All attempts & feedback:'}
+										{isCurrentStep
+											? "Previous feedback:"
+											: "All attempts & feedback:"}
 									</p>
 									<div className="space-y-2">
 										{/* For previous steps: show all attempts and feedback */}
-										{!isCurrentStep && stepAttempts.map((attempt, attemptIndex) => {
-											const isCorrectAttempt = attempt.isCorrect;
-											const bgColor = isCorrectAttempt ? 'bg-green-50' : 'bg-red-50';
-											const borderColor = isCorrectAttempt ? 'border-green-200' : 'border-red-200';
-											const textColor = isCorrectAttempt ? 'text-green-700' : 'text-red-700';
-											const label = isCorrectAttempt ? 'Correct' : 'Incorrect';
-											
-											return (
-												<div
-													key={`accordion-attempt-${stepNumber}-${attempt.timestamp.getTime()}-${attemptIndex}`}
-													className={`p-3 rounded-lg border ${bgColor} ${borderColor}`}
-												>
-													<div className="flex items-start">
-														<span className={`text-xs font-medium ${textColor} mr-2 mt-0.5`}>
-															{label}
-														</span>
-														<div className="flex-1">
-															<p className="text-sm font-mono text-gray-800 mb-1">
-																{attempt.input}
-															</p>
-															{attempt.feedback && (
-																<p className="text-sm text-gray-700">
-																	{attempt.feedback}
-																</p>
-															)}
-														</div>
-													</div>
-												</div>
-											);
-										})}
-										
-										{/* For current step: show previous feedback from feedbackHistory (excluding most recent) */}
-										{isCurrentStep && stepFeedback
-											.sort((a, b) => a.order - b.order) // Ensure proper ordering
-											.filter((feedback, index, array) => index < array.length - 1) // Exclude most recent
-											.map((feedback) => {
-												// Style feedback based on validation result
-												const isSuccess = feedback.validationResult === 'CORRECT_FINAL_STEP' || 
-																 feedback.validationResult === 'CORRECT_INTERMEDIATE_STEP';
-												const bgColor = isSuccess ? 'bg-green-50' : 'bg-orange-50';
-												const borderColor = isSuccess ? 'border-green-200' : 'border-orange-200';
-												const textColor = isSuccess ? 'text-green-700' : 'text-orange-700';
-												
+										{!isCurrentStep &&
+											stepAttempts.map((attempt, attemptIndex) => {
+												const isCorrectAttempt = attempt.isCorrect;
+												const bgColor = isCorrectAttempt
+													? "bg-green-50"
+													: "bg-red-50";
+												const borderColor = isCorrectAttempt
+													? "border-green-200"
+													: "border-red-200";
+												const textColor = isCorrectAttempt
+													? "text-green-700"
+													: "text-red-700";
+												const label = isCorrectAttempt
+													? "Correct"
+													: "Incorrect";
+
 												return (
 													<div
-														key={feedback.id}
+														key={`accordion-attempt-${stepNumber}-${attempt.timestamp.getTime()}-${attemptIndex}`}
 														className={`p-3 rounded-lg border ${bgColor} ${borderColor}`}
 													>
 														<div className="flex items-start">
-															<span className={`text-xs font-medium ${textColor} mr-2 mt-0.5`}>
-																#{feedback.order}
+															<span
+																className={`text-xs font-medium ${textColor} mr-2 mt-0.5`}
+															>
+																{label}
 															</span>
-															<p className="text-sm text-gray-800 flex-1">
-																{feedback.feedback}
-															</p>
+															<div className="flex-1">
+																<p className="text-sm font-mono text-gray-800 mb-1">
+																	{attempt.input}
+																</p>
+																{attempt.feedback && (
+																	<p className="text-sm text-gray-700">
+																		{attempt.feedback}
+																	</p>
+																)}
+															</div>
 														</div>
 													</div>
 												);
 											})}
+
+										{/* For current step: show previous feedback from feedbackHistory (excluding most recent) */}
+										{isCurrentStep &&
+											stepFeedback
+												.sort((a, b) => a.order - b.order) // Ensure proper ordering
+												.filter(
+													(feedback, index, array) => index < array.length - 1,
+												) // Exclude most recent
+												.map((feedback) => {
+													// Style feedback based on validation result
+													const isSuccess =
+														feedback.validationResult ===
+															"CORRECT_FINAL_STEP" ||
+														feedback.validationResult ===
+															"CORRECT_INTERMEDIATE_STEP";
+													const bgColor = isSuccess
+														? "bg-green-50"
+														: "bg-orange-50";
+													const borderColor = isSuccess
+														? "border-green-200"
+														: "border-orange-200";
+													const textColor = isSuccess
+														? "text-green-700"
+														: "text-orange-700";
+
+													return (
+														<div
+															key={feedback.id}
+															className={`p-3 rounded-lg border ${bgColor} ${borderColor}`}
+														>
+															<div className="flex items-start">
+																<span
+																	className={`text-xs font-medium ${textColor} mr-2 mt-0.5`}
+																>
+																	#{feedback.order}
+																</span>
+																<p className="text-sm text-gray-800 flex-1">
+																	{feedback.feedback}
+																</p>
+															</div>
+														</div>
+													);
+												})}
 									</div>
 								</div>
 							)}
@@ -435,9 +490,11 @@ export function StepsHistory({
 							</p>
 							{incorrectAttempts.map((attempt, attemptIndex) => {
 								const attemptId = `current-attempt-${attempt.timestamp.getTime()}-${attemptIndex}`;
-								const hasFeedback = attempt.feedback && attempt.feedback !== 'Getting feedback...';
+								const hasFeedback =
+									attempt.feedback &&
+									attempt.feedback !== "Getting feedback...";
 								const isAttemptExpanded = expandedAttempts.has(attemptId);
-								
+
 								return (
 									<div
 										key={attemptId}
@@ -466,14 +523,14 @@ export function StepsHistory({
 												<p className="font-mono text-gray-800 mb-1">
 													{attempt.input}
 												</p>
-												
+
 												{/* Show loading state */}
-												{attempt.feedback === 'Getting feedback...' && (
+												{attempt.feedback === "Getting feedback..." && (
 													<p className="text-sm text-red-600 mt-2 p-2 bg-red-100 rounded border">
 														{attempt.feedback}
 													</p>
 												)}
-												
+
 												{/* Show feedback in accordion format for attempts with feedback */}
 												{hasFeedback && (
 													<div className="mt-2">
@@ -491,22 +548,22 @@ export function StepsHistory({
 													</div>
 												)}
 											</div>
-											
+
 											{/* Toggle button for feedback - only show if there's feedback */}
 											{hasFeedback && (
 												<button
 													type="button"
 													onClick={() => toggleAttemptFeedback(attemptId)}
 													className="ml-2 p-1 text-red-400 hover:text-red-600 transition-colors"
-													aria-label={`${isAttemptExpanded ? 'Hide' : 'Show'} feedback for incorrect attempt`}
+													aria-label={`${isAttemptExpanded ? "Hide" : "Show"} feedback for incorrect attempt`}
 												>
 													<svg
-														className={`w-4 h-4 transform transition-transform ${isAttemptExpanded ? 'rotate-180' : ''}`}
+														className={`w-4 h-4 transform transition-transform ${isAttemptExpanded ? "rotate-180" : ""}`}
 														fill="none"
 														stroke="currentColor"
 														viewBox="0 0 24 24"
 													>
-														<title>{`${isAttemptExpanded ? 'Hide' : 'Show'} feedback`}</title>
+														<title>{`${isAttemptExpanded ? "Hide" : "Show"} feedback`}</title>
 														<path
 															strokeLinecap="round"
 															strokeLinejoin="round"

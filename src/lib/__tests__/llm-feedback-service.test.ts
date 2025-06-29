@@ -169,12 +169,15 @@ describe("LLM Feedback Service", () => {
 				// Enhanced mathematical analysis fields
 				contextualHints: ["Simplify fractions", "Use division"],
 				needsSimplification: true,
-				simplificationSuggestions: ["9/3 can be simplified to 3", "Divide both numerator and denominator by 3"],
+				simplificationSuggestions: [
+					"9/3 can be simplified to 3",
+					"Divide both numerator and denominator by 3",
+				],
 				stepOperation: {
 					operationType: "division",
 					isValid: true,
-					description: "Divided both sides by 3 to isolate x"
-				}
+					description: "Divided both sides by 3 to isolate x",
+				},
 			};
 
 			const prompt = constructPrompt(enhancedRequest);
@@ -182,7 +185,9 @@ describe("LLM Feedback Service", () => {
 			// Should include mathematical analysis section
 			expect(prompt).toContain("MATHEMATICAL ANALYSIS:");
 			expect(prompt).toContain("Expression needs simplification: true");
-			expect(prompt).toContain("Mathematical context: Simplify fractions, Use division");
+			expect(prompt).toContain(
+				"Mathematical context: Simplify fractions, Use division",
+			);
 
 			// Should include specific guidance section
 			expect(prompt).toContain("SPECIFIC GUIDANCE:");
@@ -192,11 +197,15 @@ describe("LLM Feedback Service", () => {
 			// Should include step operation analysis section
 			expect(prompt).toContain("STUDENT'S ATTEMPTED OPERATION:");
 			expect(prompt).toContain("Operation type: division");
-			expect(prompt).toContain("Operation description: Divided both sides by 3 to isolate x");
+			expect(prompt).toContain(
+				"Operation description: Divided both sides by 3 to isolate x",
+			);
 			expect(prompt).toContain("Operation validity: true");
 
 			// Should include enhanced instruction
-			expect(prompt).toContain("Use the mathematical analysis above to provide specific guidance");
+			expect(prompt).toContain(
+				"Use the mathematical analysis above to provide specific guidance",
+			);
 		});
 
 		it("should handle empty enhanced analysis gracefully", () => {

@@ -578,10 +578,7 @@ export default function ProblemCreator({
 										{formData.solutionSteps
 											.filter((step) => step.trim())
 											.map((step, index) => (
-												<li
-													key={step}
-													className="flex items-center gap-2"
-												>
+												<li key={step} className="flex items-center gap-2">
 													<span className="text-sm text-gray-500 min-w-6">
 														{index + 1}.
 													</span>

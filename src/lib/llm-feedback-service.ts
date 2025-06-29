@@ -25,7 +25,7 @@ export interface LLMFeedbackRequest {
 	problemModel: ProblemModel;
 	feedbackHistory?: FeedbackHistory;
 	currentStepIndex: number;
-	
+
 	// Enhanced mathematical analysis fields (LLM Prompt 2.0)
 	contextualHints?: string[];
 	stepOperation?: {
@@ -35,7 +35,7 @@ export interface LLMFeedbackRequest {
 	};
 	needsSimplification?: boolean;
 	simplificationSuggestions?: string[];
-	
+
 	// Hint system fields
 	isHintRequest?: boolean;
 	expectedNextSteps?: string[];
@@ -49,7 +49,10 @@ export interface LLMFeedbackResponse {
 /**
  * Gets previous feedback for the current step to provide context for progressive hints
  */
-function getPreviousFeedbackForStep(feedbackHistory: FeedbackHistory, stepIndex: number): FeedbackEntry[] {
+function getPreviousFeedbackForStep(
+	feedbackHistory: FeedbackHistory,
+	stepIndex: number,
+): FeedbackEntry[] {
 	return feedbackHistory[stepIndex] || [];
 }
 
@@ -57,34 +60,36 @@ function getPreviousFeedbackForStep(feedbackHistory: FeedbackHistory, stepIndex:
  * Formats mathematical analysis context for enhanced LLM prompts (LLM Prompt 2.0)
  */
 function formatMathematicalAnalysis(request: LLMFeedbackRequest): string {
-	const { contextualHints, needsSimplification, simplificationSuggestions } = request;
-	
+	const { contextualHints, needsSimplification, simplificationSuggestions } =
+		request;
+
 	// Check if all fields are effectively empty
 	const hasContextualHints = contextualHints && contextualHints.length > 0;
 	const hasSimplificationData = needsSimplification !== undefined;
-	const hasSuggestions = simplificationSuggestions && simplificationSuggestions.length > 0;
-	
+	const hasSuggestions =
+		simplificationSuggestions && simplificationSuggestions.length > 0;
+
 	if (!hasContextualHints && !hasSimplificationData && !hasSuggestions) {
-		return '';
+		return "";
 	}
-	
-	let analysis = '\n\nMATHEMATICAL ANALYSIS:';
-	
+
+	let analysis = "\n\nMATHEMATICAL ANALYSIS:";
+
 	if (hasSimplificationData) {
 		analysis += `\n- Expression needs simplification: ${needsSimplification}`;
 	}
-	
+
 	if (hasContextualHints) {
-		analysis += `\n- Mathematical context: ${contextualHints.join(', ')}`;
+		analysis += `\n- Mathematical context: ${contextualHints.join(", ")}`;
 	}
-	
+
 	if (hasSuggestions) {
-		analysis += '\n\nSPECIFIC GUIDANCE:';
+		analysis += "\n\nSPECIFIC GUIDANCE:";
 		for (const suggestion of simplificationSuggestions) {
 			analysis += `\n- ${suggestion}`;
 		}
 	}
-	
+
 	return analysis;
 }
 
@@ -93,11 +98,11 @@ function formatMathematicalAnalysis(request: LLMFeedbackRequest): string {
  */
 function formatStepOperationAnalysis(request: LLMFeedbackRequest): string {
 	const { stepOperation } = request;
-	
+
 	if (!stepOperation) {
-		return '';
+		return "";
 	}
-	
+
 	return `\n\nSTUDENT'S ATTEMPTED OPERATION:
 - Operation type: ${stepOperation.operationType}
 - Operation description: ${stepOperation.description}
@@ -114,9 +119,9 @@ function constructHintPrompt(request: LLMFeedbackRequest): string {
 		studentInput,
 		expectedNextSteps = [],
 	} = request;
-	
+
 	const nextStep = expectedNextSteps[0] || "Continue working on the problem";
-	
+
 	return `
 You are a math tutor helping a student who is stuck after multiple attempts.
 
@@ -162,7 +167,10 @@ export function constructPrompt(request: LLMFeedbackRequest): string {
 		return constructHintPrompt(request);
 	}
 
-	const previousFeedback = getPreviousFeedbackForStep(feedbackHistory, currentStepIndex);
+	const previousFeedback = getPreviousFeedbackForStep(
+		feedbackHistory,
+		currentStepIndex,
+	);
 	const attemptNumber = previousFeedback.length + 1;
 	const isFirstAttempt = attemptNumber === 1;
 
@@ -182,14 +190,20 @@ Student input: ${studentInput}
 Validation: ${validationResult}${mathematicalAnalysis}${stepOperationAnalysis}`;
 
 	// Add previous feedback context if this isn't the first attempt
-	const feedbackContext = !isFirstAttempt ? `
+	const feedbackContext = !isFirstAttempt
+		? `
 
 Previous feedback given to student for this step:
-${previousFeedback.map((entry, i) => `Attempt ${i + 1}: ${entry.feedback}`).join('\n')}
+${previousFeedback.map((entry, i) => `Attempt ${i + 1}: ${entry.feedback}`).join("\n")}
 
-IMPORTANT: Don't repeat information already given. Provide new insight or be more specific.` : '';
+IMPORTANT: Don't repeat information already given. Provide new insight or be more specific.`
+		: "";
 
-	const hintLevel = isFirstAttempt ? 'minimal' : attemptNumber === 2 ? 'moderate' : 'detailed';
+	const hintLevel = isFirstAttempt
+		? "minimal"
+		: attemptNumber === 2
+			? "moderate"
+			: "detailed";
 
 	switch (validationResult) {
 		case "CORRECT_FINAL_STEP":
@@ -200,27 +214,27 @@ Student solved the problem! Briefly confirm correctness. 1 sentence.`;
 		case "CORRECT_INTERMEDIATE_STEP":
 			return `${baseContext}${feedbackContext}
 
-Student made correct progress. Acknowledge briefly, then give a ${hintLevel} hint about the next step. ${hintLevel === 'detailed' ? 'You can be more specific about what operation to try.' : '1-2 sentences.'} `;
+Student made correct progress. Acknowledge briefly, then give a ${hintLevel} hint about the next step. ${hintLevel === "detailed" ? "You can be more specific about what operation to try." : "1-2 sentences."} `;
 
 		case "CORRECT_BUT_NOT_SIMPLIFIED":
 			return `${baseContext}${feedbackContext}
 
-Student is correct but needs to simplify. ${isFirstAttempt ? 'Gently prompt to simplify further.' : 'Be more specific about what to simplify.'} Use the mathematical analysis above to provide specific guidance. 1-2 sentences.`;
+Student is correct but needs to simplify. ${isFirstAttempt ? "Gently prompt to simplify further." : "Be more specific about what to simplify."} Use the mathematical analysis above to provide specific guidance. 1-2 sentences.`;
 
 		case "VALID_BUT_NO_PROGRESS":
 			return `${baseContext}${feedbackContext}
 
-Student's step is valid but doesn't help solve the problem. ${hintLevel === 'minimal' ? 'Suggest a different approach.' : hintLevel === 'moderate' ? 'Suggest a specific operation that would help.' : 'Give a clear hint about what operation to try and why.'} Use the operation analysis above to explain what they tried and suggest better approaches. 1-2 sentences.`;
+Student's step is valid but doesn't help solve the problem. ${hintLevel === "minimal" ? "Suggest a different approach." : hintLevel === "moderate" ? "Suggest a specific operation that would help." : "Give a clear hint about what operation to try and why."} Use the operation analysis above to explain what they tried and suggest better approaches. 1-2 sentences.`;
 
 		case "EQUIVALENCE_FAILURE":
 			return `${baseContext}${feedbackContext}
 
-Student made an error. ${hintLevel === 'minimal' ? 'Point out there\'s an error, ask them to check their work.' : hintLevel === 'moderate' ? 'Identify which part has the error without giving the answer.' : 'Explain what went wrong and hint at the correct approach.'} Use the mathematical analysis and operation analysis above to provide targeted guidance. 1-2 sentences.`;
+Student made an error. ${hintLevel === "minimal" ? "Point out there's an error, ask them to check their work." : hintLevel === "moderate" ? "Identify which part has the error without giving the answer." : "Explain what went wrong and hint at the correct approach."} Use the mathematical analysis and operation analysis above to provide targeted guidance. 1-2 sentences.`;
 
 		case "PARSING_ERROR":
 			return `${baseContext}${feedbackContext}
       
-Student's input has formatting issues. ${isFirstAttempt ? 'Explain how to format math expressions clearly.' : 'Give a specific example of correct formatting.'} 1 sentence.`;
+Student's input has formatting issues. ${isFirstAttempt ? "Explain how to format math expressions clearly." : "Give a specific example of correct formatting."} 1 sentence.`;
 
 		default:
 			return `${baseContext}${feedbackContext}
