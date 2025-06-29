@@ -397,6 +397,8 @@ export function analyzeStepOperation(
 
 /**
  * Gets the expected next steps from the teacher model based on current progress
+ * Note: Currently used only in tests, but preserved for potential future features
+ * such as providing step-by-step hints to students
  *
  * @param context - The validation context
  * @returns Array of remaining teacher steps

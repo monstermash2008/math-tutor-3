@@ -161,6 +161,62 @@ describe("LLM Feedback Service", () => {
 			);
 		});
 
+		it("should include enhanced mathematical analysis in prompts (LLM Prompt 2.0)", () => {
+			const enhancedRequest = {
+				...baseLLMRequest,
+				validationResult: "CORRECT_BUT_NOT_SIMPLIFIED" as const,
+				studentInput: "3x = 9/3",
+				// Enhanced mathematical analysis fields
+				contextualHints: ["Simplify fractions", "Use division"],
+				needsSimplification: true,
+				simplificationSuggestions: ["9/3 can be simplified to 3", "Divide both numerator and denominator by 3"],
+				stepOperation: {
+					operationType: "division",
+					isValid: true,
+					description: "Divided both sides by 3 to isolate x"
+				}
+			};
+
+			const prompt = constructPrompt(enhancedRequest);
+
+			// Should include mathematical analysis section
+			expect(prompt).toContain("MATHEMATICAL ANALYSIS:");
+			expect(prompt).toContain("Expression needs simplification: true");
+			expect(prompt).toContain("Mathematical context: Simplify fractions, Use division");
+
+			// Should include specific guidance section
+			expect(prompt).toContain("SPECIFIC GUIDANCE:");
+			expect(prompt).toContain("9/3 can be simplified to 3");
+			expect(prompt).toContain("Divide both numerator and denominator by 3");
+
+			// Should include step operation analysis section
+			expect(prompt).toContain("STUDENT'S ATTEMPTED OPERATION:");
+			expect(prompt).toContain("Operation type: division");
+			expect(prompt).toContain("Operation description: Divided both sides by 3 to isolate x");
+			expect(prompt).toContain("Operation validity: true");
+
+			// Should include enhanced instruction
+			expect(prompt).toContain("Use the mathematical analysis above to provide specific guidance");
+		});
+
+		it("should handle empty enhanced analysis gracefully", () => {
+			const requestWithoutEnhancement = {
+				...baseLLMRequest,
+				validationResult: "CORRECT_INTERMEDIATE_STEP" as const,
+				// No enhanced fields provided
+			};
+
+			const prompt = constructPrompt(requestWithoutEnhancement);
+
+			// Should not include analysis sections when no enhanced data is provided
+			expect(prompt).not.toContain("MATHEMATICAL ANALYSIS:");
+			expect(prompt).not.toContain("STUDENT'S ATTEMPTED OPERATION:");
+			expect(prompt).not.toContain("SPECIFIC GUIDANCE:");
+
+			// But should still work as before
+			expect(prompt).toContain("Student made correct progress");
+		});
+
 		it("should provide progressive hints based on attempt number", () => {
 			// First attempt - minimal hints
 			const firstAttempt = {

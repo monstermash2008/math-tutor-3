@@ -2,7 +2,8 @@ import { useMutation } from '@tanstack/react-query';
 import React, { useReducer } from 'react';
 import { type FeedbackEntry, type FeedbackHistory, type LLMFeedbackRequest, constructPrompt, llmFeedbackMutationFn } from '../lib/llm-feedback-service';
 import type { ProblemModel, StepValidationResult, ValidationContext, ValidationResult } from '../lib/validation-engine';
-import { validateStep } from '../lib/validation-engine';
+import { analyzeStepOperation, generateContextualHints, getExpectedNextSteps, getSimplificationSuggestions, needsSimplification, validateStep } from '../lib/validation-engine';
+import { FeedbackDisplay } from './FeedbackDisplay';
 import { ProblemView } from './ProblemView';
 import { StepsHistory } from './StepsHistory';
 import { UserInput } from './UserInput';
@@ -27,6 +28,8 @@ interface AppState {
   feedbackStatus: FeedbackStatus;
   feedbackMessage: string;
   currentPrompt?: string; // For testing/debugging: shows the prompt sent to LLM
+  consecutiveFailures: number; // Track consecutive incorrect attempts for current step
+  isShowingHintFeedback: boolean; // Track if we're showing hint feedback (not regular step feedback)
 }
 
 // State actions
@@ -38,7 +41,11 @@ type AppAction =
   | { type: 'LLM_FEEDBACK_SUCCESS'; payload: { message: string; feedbackStatus: FeedbackStatus; stepIndex: number; validationResult: string; studentInput: string; isCorrect: boolean } }
   | { type: 'LLM_FEEDBACK_ERROR'; payload: { message: string } }
   | { type: 'LLM_PROMPT_SENT'; payload: { prompt: string } }
-  | { type: 'RESET_FEEDBACK' };
+  | { type: 'RESET_FEEDBACK' }
+  | { type: 'INCREMENT_FAILURES' }
+  | { type: 'RESET_FAILURES' }
+  | { type: 'HINT_REQUEST_START' }
+  | { type: 'HINT_REQUEST_SUCCESS'; payload: { message: string } };
 
 // Utility function to generate unique feedback entry IDs
 function generateFeedbackId(): string {
@@ -94,7 +101,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         allAttempts: [...state.allAttempts, successAttempt],
         currentStatus: 'awaiting_next_step',
         feedbackStatus: action.payload.feedbackStatus,
-        feedbackMessage: action.payload.message
+        feedbackMessage: action.payload.message,
+        consecutiveFailures: 0 // Reset on success
       };
     }
     
@@ -131,7 +139,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         allAttempts: [...state.allAttempts, solvedAttempt],
         currentStatus: 'solved',
         feedbackStatus: 'success',
-        feedbackMessage: action.payload.message
+        feedbackMessage: action.payload.message,
+        consecutiveFailures: 0 // Reset on completion
       };
     }
 
@@ -167,7 +176,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         feedbackStatus: action.payload.feedbackStatus,
         feedbackMessage: action.payload.message,
         feedbackHistory: updatedFeedbackHistory,
-        allAttempts: updatedAttempts
+        allAttempts: updatedAttempts,
+        isShowingHintFeedback: false // Regular step feedback doesn't show in FeedbackDisplay
       };
     }
 
@@ -189,7 +199,36 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         feedbackStatus: 'idle',
         feedbackMessage: '',
-        currentPrompt: undefined
+        currentPrompt: undefined,
+        isShowingHintFeedback: false // Clear hint feedback display
+      };
+    
+    case 'INCREMENT_FAILURES':
+      return {
+        ...state,
+        consecutiveFailures: state.consecutiveFailures + 1
+      };
+    
+    case 'RESET_FAILURES':
+      return {
+        ...state,
+        consecutiveFailures: 0
+      };
+    
+    case 'HINT_REQUEST_START':
+      return {
+        ...state,
+        feedbackStatus: 'loading',
+        feedbackMessage: 'Getting hint...',
+        isShowingHintFeedback: true // Show hint feedback in FeedbackDisplay
+      };
+    
+    case 'HINT_REQUEST_SUCCESS':
+      return {
+        ...state,
+        feedbackStatus: 'success',
+        feedbackMessage: action.payload.message,
+        isShowingHintFeedback: true // Keep showing hint feedback in FeedbackDisplay
       };
     
     default:
@@ -210,7 +249,9 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
     currentStatus: 'awaiting_next_step',
     feedbackStatus: 'idle',
     feedbackMessage: '',
-    currentPrompt: undefined
+    currentPrompt: undefined,
+    consecutiveFailures: 0,
+    isShowingHintFeedback: false
   };
 
   const [state, dispatch] = useReducer(appReducer, initialState);
@@ -219,6 +260,15 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
   const llmFeedbackMutation = useMutation({
     mutationFn: llmFeedbackMutationFn,
     onSuccess: (response, variables) => {
+      // Handle hint requests differently
+      if (variables.isHintRequest) {
+        dispatch({
+          type: 'HINT_REQUEST_SUCCESS',
+          payload: { message: response.feedback }
+        });
+        return;
+      }
+
       const feedbackStatus: FeedbackStatus = response.encouragement ? 'success' : 'success';
       
       // Determine if this is a correct step based on validation result
@@ -253,6 +303,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
   // Handle step validation with LLM integration
   const handleCheckStep = (studentInput: string) => {
     dispatch({ type: 'CHECK_STEP_START' });
+    dispatch({ type: 'RESET_FEEDBACK' }); // Clear any hint feedback when checking a new step
 
     // Simulate validation delay
     setTimeout(() => {
@@ -274,7 +325,19 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
           ? state.userHistory.length  // New step index for correct steps
           : state.userHistory.length - 1; // Current step index for errors (subtract 1 because userHistory includes problem statement)
 
-        // Prepare LLM feedback request with feedback history
+        // Gather enhanced mathematical analysis (LLM Prompt 2.0)
+        const contextualHints = generateContextualHints(context);
+        const needsSimpl = needsSimplification(studentInput);
+        const simplificationSuggestions = getSimplificationSuggestions(studentInput);
+        
+        // Analyze step operation (only if we have previous steps)
+        let stepOperation = undefined;
+        if (state.userHistory.length > 1) {
+          const previousStep = state.userHistory[state.userHistory.length - 1];
+          stepOperation = analyzeStepOperation(previousStep, studentInput);
+        }
+
+        // Prepare enhanced LLM feedback request with mathematical context
         const llmRequest: LLMFeedbackRequest = {
           problemStatement: problem.problemStatement,
           userHistory: state.userHistory,
@@ -282,7 +345,13 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
           validationResult: result.result,
           problemModel: problem,
           feedbackHistory: state.feedbackHistory,
-          currentStepIndex: Math.max(0, currentStepIndex) // Ensure non-negative
+          currentStepIndex: Math.max(0, currentStepIndex), // Ensure non-negative
+          
+          // Enhanced mathematical analysis fields (LLM Prompt 2.0)
+          contextualHints,
+          stepOperation,
+          needsSimplification: needsSimpl,
+          simplificationSuggestions,
         };
 
         // Generate and store the prompt for debugging
@@ -314,6 +383,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
           case 'EQUIVALENCE_FAILURE':
           case 'PARSING_ERROR':
             // For errors, don't update history but still get LLM feedback
+            dispatch({ type: 'INCREMENT_FAILURES' });
             dispatch({ 
               type: 'CHECK_STEP_ERROR', 
               payload: { 
@@ -347,8 +417,47 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
     }, 1000); // 1 second delay to simulate processing
   };
 
+  // Handle hint request when student is stuck
+  const handleHintRequest = () => {
+    dispatch({ type: 'HINT_REQUEST_START' });
+
+    try {
+      // Create validation context
+      const context: ValidationContext = {
+        problemModel: problem,
+        userHistory: state.userHistory,
+        studentInput: '' // Empty for hint requests
+      };
+
+      // Get expected next steps
+      const expectedNextSteps = getExpectedNextSteps(context);
+
+      // Prepare LLM hint request
+      const hintRequest: LLMFeedbackRequest = {
+        problemStatement: problem.problemStatement,
+        userHistory: state.userHistory,
+        studentInput: 'I need help with the next step',
+        validationResult: 'EQUIVALENCE_FAILURE', // Not used for hints
+        problemModel: problem,
+        feedbackHistory: state.feedbackHistory,
+        currentStepIndex: Math.max(0, state.userHistory.length - 1),
+        isHintRequest: true,
+        expectedNextSteps
+      };
+
+      // Send hint request to LLM
+      llmFeedbackMutation.mutate(hintRequest);
+    } catch (error) {
+      dispatch({
+        type: 'LLM_FEEDBACK_ERROR',
+        payload: { message: 'Unable to get hint right now. Please try again.' }
+      });
+    }
+  };
+
   const isSolved = state.currentStatus === 'solved';
   const stepNumber = state.userHistory.length; // Current step number
+  const showHintButton = state.consecutiveFailures >= 3 && !isSolved;
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4 sm:p-8 bg-white rounded-2xl shadow-lg border border-gray-200">
@@ -375,6 +484,32 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
         isSolved={isSolved}
         stepNumber={stepNumber}
       />
+
+      {/* Feedback Display - only for hint requests */}
+      {state.isShowingHintFeedback && (
+        <FeedbackDisplay 
+          status={state.feedbackStatus}
+          message={state.feedbackMessage}
+          prompt={state.currentPrompt}
+        />
+      )}
+
+      {/* Hint Button - shown after 3 consecutive failures */}
+      {showHintButton && (
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={handleHintRequest}
+            disabled={state.feedbackStatus === 'loading'}
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
+          >
+            {state.feedbackStatus === 'loading' ? 'Getting hint...' : "I'm stuck! 💡"}
+          </button>
+          <p className="text-sm text-gray-500 mt-2">
+            Get a hint with the next step explained
+          </p>
+        </div>
+      )}
     </div>
   );
 }

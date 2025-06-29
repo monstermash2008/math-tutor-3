@@ -25,6 +25,20 @@ export interface LLMFeedbackRequest {
 	problemModel: ProblemModel;
 	feedbackHistory?: FeedbackHistory;
 	currentStepIndex: number;
+	
+	// Enhanced mathematical analysis fields (LLM Prompt 2.0)
+	contextualHints?: string[];
+	stepOperation?: {
+		operationType: string;
+		isValid: boolean;
+		description: string;
+	};
+	needsSimplification?: boolean;
+	simplificationSuggestions?: string[];
+	
+	// Hint system fields
+	isHintRequest?: boolean;
+	expectedNextSteps?: string[];
 }
 
 export interface LLMFeedbackResponse {
@@ -40,7 +54,95 @@ function getPreviousFeedbackForStep(feedbackHistory: FeedbackHistory, stepIndex:
 }
 
 /**
+ * Formats mathematical analysis context for enhanced LLM prompts (LLM Prompt 2.0)
+ */
+function formatMathematicalAnalysis(request: LLMFeedbackRequest): string {
+	const { contextualHints, needsSimplification, simplificationSuggestions } = request;
+	
+	// Check if all fields are effectively empty
+	const hasContextualHints = contextualHints && contextualHints.length > 0;
+	const hasSimplificationData = needsSimplification !== undefined;
+	const hasSuggestions = simplificationSuggestions && simplificationSuggestions.length > 0;
+	
+	if (!hasContextualHints && !hasSimplificationData && !hasSuggestions) {
+		return '';
+	}
+	
+	let analysis = '\n\nMATHEMATICAL ANALYSIS:';
+	
+	if (hasSimplificationData) {
+		analysis += `\n- Expression needs simplification: ${needsSimplification}`;
+	}
+	
+	if (hasContextualHints) {
+		analysis += `\n- Mathematical context: ${contextualHints.join(', ')}`;
+	}
+	
+	if (hasSuggestions) {
+		analysis += '\n\nSPECIFIC GUIDANCE:';
+		for (const suggestion of simplificationSuggestions) {
+			analysis += `\n- ${suggestion}`;
+		}
+	}
+	
+	return analysis;
+}
+
+/**
+ * Formats step operation analysis for enhanced LLM prompts (LLM Prompt 2.0)
+ */
+function formatStepOperationAnalysis(request: LLMFeedbackRequest): string {
+	const { stepOperation } = request;
+	
+	if (!stepOperation) {
+		return '';
+	}
+	
+	return `\n\nSTUDENT'S ATTEMPTED OPERATION:
+- Operation type: ${stepOperation.operationType}
+- Operation description: ${stepOperation.description}
+- Operation validity: ${stepOperation.isValid}`;
+}
+
+/**
+ * Constructs a specialized prompt for hint requests when students are stuck
+ */
+function constructHintPrompt(request: LLMFeedbackRequest): string {
+	const {
+		problemStatement,
+		userHistory,
+		studentInput,
+		expectedNextSteps = [],
+	} = request;
+	
+	const nextStep = expectedNextSteps[0] || "Continue working on the problem";
+	
+	return `
+You are a math tutor helping a student who is stuck after multiple attempts.
+
+Problem: ${problemStatement}
+Previous steps: ${
+		userHistory
+			.slice(1)
+			.map((step, i) => `${i + 1}. ${step}`)
+			.join("\n") || "None"
+	}
+Student's attempt: ${studentInput}
+
+The correct next step is: ${nextStep}
+
+TASK: Explain this next step to the student. Include:
+1. What operation they should perform
+2. WHY this operation is the right choice
+3. How it moves them closer to solving the problem
+4. Any mathematical concept they should understand
+
+Be encouraging - they tried hard and asked for help. You can be more detailed than usual (2-4 sentences).`;
+}
+
+/**
  * Constructs a pedagogically-focused prompt for the LLM based on validation results and previous feedback
+ * Enhanced with rich mathematical context (LLM Prompt 2.0)
  */
 export function constructPrompt(request: LLMFeedbackRequest): string {
 	const {
@@ -51,11 +153,22 @@ export function constructPrompt(request: LLMFeedbackRequest): string {
 		problemModel,
 		feedbackHistory = {},
 		currentStepIndex,
+		isHintRequest = false,
+		expectedNextSteps = [],
 	} = request;
+
+	// Handle hint requests separately
+	if (isHintRequest) {
+		return constructHintPrompt(request);
+	}
 
 	const previousFeedback = getPreviousFeedbackForStep(feedbackHistory, currentStepIndex);
 	const attemptNumber = previousFeedback.length + 1;
 	const isFirstAttempt = attemptNumber === 1;
+
+	// Enhanced mathematical analysis sections (LLM Prompt 2.0)
+	const mathematicalAnalysis = formatMathematicalAnalysis(request);
+	const stepOperationAnalysis = formatStepOperationAnalysis(request);
 
 	const baseContext = `
 You are a math tutor. Problem: ${problemStatement}
@@ -66,7 +179,7 @@ Previous steps: ${
 			.join("\n") || "None"
 	}
 Student input: ${studentInput}
-Validation: ${validationResult}`;
+Validation: ${validationResult}${mathematicalAnalysis}${stepOperationAnalysis}`;
 
 	// Add previous feedback context if this isn't the first attempt
 	const feedbackContext = !isFirstAttempt ? `
@@ -92,17 +205,17 @@ Student made correct progress. Acknowledge briefly, then give a ${hintLevel} hin
 		case "CORRECT_BUT_NOT_SIMPLIFIED":
 			return `${baseContext}${feedbackContext}
 
-Student is correct but needs to simplify. ${isFirstAttempt ? 'Gently prompt to simplify further.' : 'Be more specific about what to simplify.'} 1-2 sentences.`;
+Student is correct but needs to simplify. ${isFirstAttempt ? 'Gently prompt to simplify further.' : 'Be more specific about what to simplify.'} Use the mathematical analysis above to provide specific guidance. 1-2 sentences.`;
 
 		case "VALID_BUT_NO_PROGRESS":
 			return `${baseContext}${feedbackContext}
 
-Student's step is valid but doesn't help solve the problem. ${hintLevel === 'minimal' ? 'Suggest a different approach.' : hintLevel === 'moderate' ? 'Suggest a specific operation that would help.' : 'Give a clear hint about what operation to try and why.'} 1-2 sentences.`;
+Student's step is valid but doesn't help solve the problem. ${hintLevel === 'minimal' ? 'Suggest a different approach.' : hintLevel === 'moderate' ? 'Suggest a specific operation that would help.' : 'Give a clear hint about what operation to try and why.'} Use the operation analysis above to explain what they tried and suggest better approaches. 1-2 sentences.`;
 
 		case "EQUIVALENCE_FAILURE":
 			return `${baseContext}${feedbackContext}
 
-Student made an error. ${hintLevel === 'minimal' ? 'Point out there\'s an error, ask them to check their work.' : hintLevel === 'moderate' ? 'Identify which part has the error without giving the answer.' : 'Explain what went wrong and hint at the correct approach.'} 1-2 sentences.`;
+Student made an error. ${hintLevel === 'minimal' ? 'Point out there\'s an error, ask them to check their work.' : hintLevel === 'moderate' ? 'Identify which part has the error without giving the answer.' : 'Explain what went wrong and hint at the correct approach.'} Use the mathematical analysis and operation analysis above to provide targeted guidance. 1-2 sentences.`;
 
 		case "PARSING_ERROR":
 			return `${baseContext}${feedbackContext}
@@ -122,7 +235,7 @@ Provide helpful guidance. 1 sentence.`;
 export async function getLLMFeedback(
 	request: LLMFeedbackRequest,
 ): Promise<LLMFeedbackResponse> {
-	const { validationResult } = request;
+	const { validationResult, isHintRequest = false } = request;
 	const apiKey = env.VITE_OPENROUTER_API_KEY;
 
 	if (!apiKey) {
@@ -152,7 +265,7 @@ export async function getLLMFeedback(
 							content: prompt,
 						},
 					],
-					max_tokens: 150, // Keep responses concise
+					max_tokens: isHintRequest ? 300 : 150, // More tokens for detailed hints
 					temperature: 0.7, // Balanced creativity/consistency
 				}),
 			},

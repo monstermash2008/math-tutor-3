@@ -59,7 +59,7 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			await waitFor(
 				() => {
 					expect(screen.getByText("3x + 3 = 12")).toBeInTheDocument();
-					expect(screen.getByText("Getting feedback...")).toBeInTheDocument();
+					expect(screen.getAllByText("Getting feedback...")).toHaveLength(1); // Only in StepsHistory now
 					expect(screen.getByTitle("Loading spinner")).toBeInTheDocument();
 				},
 				{ timeout: 2000 },
@@ -83,7 +83,7 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			// the mutation gets stuck in loading state
 			await waitFor(
 				() => {
-					expect(screen.getByText("Getting feedback...")).toBeInTheDocument();
+					expect(screen.getAllByText("Getting feedback...")).toHaveLength(1); // Only in StepsHistory now
 				},
 				{ timeout: 2000 },
 			);
@@ -110,7 +110,7 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 				() => {
 					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
 					expect(screen.getByText("7x = 9")).toBeInTheDocument();
-					expect(screen.getByText("Getting feedback...")).toBeInTheDocument();
+					expect(screen.getAllByText("Getting feedback...")).toHaveLength(1); // Only in StepsHistory now
 				},
 				{ timeout: 2000 },
 			);
@@ -136,7 +136,7 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 				() => {
 					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
 					expect(screen.getByText("3x ++ 5 = 12")).toBeInTheDocument();
-					expect(screen.getByText("Getting feedback...")).toBeInTheDocument();
+					expect(screen.getAllByText("Getting feedback...")).toHaveLength(1); // Only in StepsHistory now
 				},
 				{ timeout: 2000 },
 			);

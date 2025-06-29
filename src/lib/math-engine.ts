@@ -1,4 +1,10 @@
-import { type ConstantNode, type MathNode, type OperatorNode, parse, simplify } from "mathjs";
+import {
+	type ConstantNode,
+	type MathNode,
+	type OperatorNode,
+	parse,
+	simplify,
+} from "mathjs";
 
 /**
  * Custom error class for mathematical parsing errors
@@ -38,7 +44,7 @@ function validateMathInput(input: string): void {
 /**
  * Validates and parses mathematical input syntax
  * This is a lightweight validation function that extracts common parsing logic
- * 
+ *
  * @param input - The mathematical string to validate and parse
  * @returns Parsed input data with validation completed
  * @throws MathParsingError if the input has syntax errors
