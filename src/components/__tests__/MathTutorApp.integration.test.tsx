@@ -516,5 +516,46 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 				);
 			}
 		}, 10000);
+
+		it("should NOT show incorrect step feedback in FeedbackDisplay component", async () => {
+			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
+
+			const input = screen.getByRole("textbox");
+			const checkButton = screen.getByRole("button", { name: /check/i });
+
+			// Enter incorrect step
+			fireEvent.change(input, { target: { value: "7x = 9" } });
+			fireEvent.click(checkButton);
+
+			// Wait for validation to complete
+			await waitFor(
+				() => {
+					expect(screen.getByText("7x = 9")).toBeInTheDocument();
+					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			// Wait for feedback to be available in accordion
+			await waitFor(
+				() => {
+					expect(screen.getByText("Feedback available - click to expand")).toBeInTheDocument();
+				},
+				{ timeout: 1500 },
+			);
+
+			// Check that there's NO FeedbackDisplay component visible
+			// (FeedbackDisplay has a specific "feedback-card" class and "Tutor Feedback" heading)
+			expect(screen.queryByText("Tutor Feedback")).not.toBeInTheDocument();
+			expect(screen.queryByTestId("feedback-card")).not.toBeInTheDocument();
+			
+			// Also check for the FeedbackDisplay container class
+			const feedbackCards = document.querySelectorAll('.feedback-card');
+			expect(feedbackCards).toHaveLength(0);
+
+			// Verify feedback is only in the collapsed accordion
+			expect(screen.queryByText("This step is incorrect. Try again.")).not.toBeInTheDocument();
+			expect(screen.getByText("Feedback available - click to expand")).toBeInTheDocument();
+		}, 3000);
 	});
 });
