@@ -138,7 +138,11 @@ describe('StepsHistory Component', () => {
     const incorrectAttempts = screen.getAllByText('Incorrect Attempt');
     expect(incorrectAttempts.length).toBeGreaterThan(0);
     expect(screen.getByText('4x - 12 - x - 5 = 14')).toBeInTheDocument();
-    expect(screen.getByText('Check your arithmetic')).toBeInTheDocument();
+    
+    // Incorrect attempt feedback should be hidden when there's correct step feedback
+    expect(screen.queryByText('Check your arithmetic')).not.toBeInTheDocument();
+    // But correct step feedback should be shown
+    expect(screen.getByText('Great job!')).toBeInTheDocument();
   });
 
   it('shows final answer with special styling when solved', () => {

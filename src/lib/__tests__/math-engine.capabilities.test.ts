@@ -1,5 +1,14 @@
+import { parse } from 'mathjs';
 import { describe, expect, it } from 'vitest';
 import { areEquivalent, isFullySimplified } from '../math-engine';
+import { 
+  analyzeExpressionTree,
+  findLikeTerms, 
+  getSimplificationFeedback,
+  hasConstantOperations, 
+  hasDistributiveOpportunities,
+  hasUnsimplifiedOperations
+} from '../math-engine';
 
 describe('Math Engine - Capabilities', () => {
   describe('Linear Algebra - Basic Operations', () => {
@@ -192,6 +201,174 @@ describe('Math Engine - Capabilities', () => {
         
         expect(isFullySimplified('2x + 3x - x + 5')).toBe(false);
         expect(isFullySimplified('4x + 5')).toBe(true);
+      });
+    });
+  });
+
+  describe('Tree-Based Analysis (Phase 6a)', () => {
+    describe('hasConstantOperations', () => {
+      it('should detect constant arithmetic operations', () => {
+        const node = parse('2 + 3 + x');
+        const patterns = hasConstantOperations(node);
+        
+        expect(patterns).toHaveLength(1);
+        expect(patterns[0].type).toBe('CONSTANT_ARITHMETIC');
+        expect(patterns[0].description).toContain('2 + 3');
+      });
+
+      it('should not detect constants in simplified expressions', () => {
+        const node = parse('x + 5');
+        const patterns = hasConstantOperations(node);
+        
+        expect(patterns).toHaveLength(0);
+      });
+
+      it('should detect multiple constant operations', () => {
+        const node = parse('2 + 3 + 4 * 5 + x');
+        const patterns = hasConstantOperations(node);
+        
+        expect(patterns.length).toBeGreaterThan(0);
+        expect(patterns.some(p => p.type === 'CONSTANT_ARITHMETIC')).toBe(true);
+      });
+    });
+
+    describe('findLikeTerms', () => {
+      it('should detect like terms', () => {
+        const node = parse('3x + 2x + 5');
+        const patterns = findLikeTerms(node);
+        
+        expect(patterns).toHaveLength(1);
+        expect(patterns[0].type).toBe('LIKE_TERMS');
+        expect(patterns[0].description).toContain('x');
+      });
+
+      it('should not detect like terms in expressions without them', () => {
+        const node = parse('2x + 3y');
+        const patterns = findLikeTerms(node);
+        
+        expect(patterns).toHaveLength(0);
+      });
+
+      it('should handle complex like terms', () => {
+        const node = parse('2x^2 + 3x^2 + 4x + 5');
+        const patterns = findLikeTerms(node);
+        
+        expect(patterns.length).toBeGreaterThan(0);
+        expect(patterns.some(p => p.description.includes('x ^ 2'))).toBe(true);
+      });
+    });
+
+    describe('hasDistributiveOpportunities', () => {
+      it('should detect distributive opportunities', () => {
+        const node = parse('4(x + 2) + 3');
+        const patterns = hasDistributiveOpportunities(node);
+        
+        expect(patterns).toHaveLength(1);
+        expect(patterns[0].type).toBe('DISTRIBUTIVE');
+      });
+
+      it('should not detect distributive opportunities in simplified expressions', () => {
+        const node = parse('4x + 8 + 3');
+        const patterns = hasDistributiveOpportunities(node);
+        
+        expect(patterns).toHaveLength(0);
+      });
+    });
+
+    describe('hasUnsimplifiedOperations', () => {
+      it('should detect unsimplified operations', () => {
+        const node = parse('2 + 3 + x');
+        const result = hasUnsimplifiedOperations(node);
+        
+        expect(result).toBe(true);
+      });
+
+      it('should not detect unsimplified operations in simplified expressions', () => {
+        const node = parse('x + 5');
+        const result = hasUnsimplifiedOperations(node);
+        
+        expect(result).toBe(false);
+      });
+
+      it('should detect coefficient normalization opportunities', () => {
+        const node = parse('1 * x + 5');
+        const result = hasUnsimplifiedOperations(node);
+        
+        expect(result).toBe(true);
+      });
+    });
+
+    describe('analyzeExpressionTree', () => {
+      it('should provide comprehensive analysis for unsimplified expressions', () => {
+        const result = analyzeExpressionTree('2 + 3 + x');
+        
+        expect(result.isFullySimplified).toBe(false);
+        expect(result.patterns.length).toBeGreaterThan(0);
+        expect(result.hasUnsimplifiedOperations).toBe(true);
+      });
+
+      it('should recognize fully simplified expressions', () => {
+        const result = analyzeExpressionTree('x + 5');
+        
+        expect(result.isFullySimplified).toBe(true);
+        expect(result.patterns).toHaveLength(0);
+        expect(result.hasUnsimplifiedOperations).toBe(false);
+      });
+
+      it('should handle complex expressions with multiple patterns', () => {
+        const result = analyzeExpressionTree('2 + 3 + 3x + 2x + 4(y + 1)');
+        
+        expect(result.isFullySimplified).toBe(false);
+        expect(result.patterns.length).toBeGreaterThan(1);
+        
+        const patternTypes = result.patterns.map(p => p.type);
+        expect(patternTypes).toContain('CONSTANT_ARITHMETIC');
+        expect(patternTypes).toContain('LIKE_TERMS');
+        expect(patternTypes).toContain('DISTRIBUTIVE');
+      });
+
+      it('should handle malformed input gracefully', () => {
+        const result = analyzeExpressionTree('(3 + 5'); // Unmatched parenthesis
+        
+        expect(result.isFullySimplified).toBe(false);
+        expect(result.patterns).toHaveLength(0);
+        expect(result.hasUnsimplifiedOperations).toBe(false);
+      });
+    });
+
+    describe('getSimplificationFeedback', () => {
+      it('should provide specific feedback for different pattern types', () => {
+        const result = analyzeExpressionTree('2 + 3 + 3x + 2x + 4(y + 1)');
+        const feedback = getSimplificationFeedback(result.patterns);
+        
+        expect(feedback.length).toBeGreaterThan(0);
+        expect(feedback.some(f => f.includes('arithmetic'))).toBe(true);
+        expect(feedback.some(f => f.includes('like terms'))).toBe(true);
+        expect(feedback.some(f => f.includes('distributive'))).toBe(true);
+      });
+
+      it('should return empty feedback for no patterns', () => {
+        const feedback = getSimplificationFeedback([]);
+        
+        expect(feedback).toHaveLength(0);
+      });
+    });
+
+    describe('Integration with existing math engine', () => {
+      it('should work with equations', () => {
+        // Test that it can analyze parts of equations
+        const result = analyzeExpressionTree('3x + 2x');
+        
+        expect(result.isFullySimplified).toBe(false);
+        expect(result.patterns.some(p => p.type === 'LIKE_TERMS')).toBe(true);
+      });
+
+      it('should provide actionable suggestions', () => {
+        const result = analyzeExpressionTree('3x + 2x + 5 + 7');
+        const feedback = getSimplificationFeedback(result.patterns);
+        
+        expect(feedback.length).toBeGreaterThan(0);
+        expect(feedback.every(f => f.includes('You can'))).toBe(true);
       });
     });
   });

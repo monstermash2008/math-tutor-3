@@ -1,7 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
 import React, { useReducer } from 'react';
 import { type FeedbackEntry, type FeedbackHistory, type LLMFeedbackRequest, constructPrompt, llmFeedbackMutationFn } from '../lib/llm-feedback-service';
-import { type ProblemModel, type ValidationContext, type ValidationResult, validateStep } from '../lib/validation-engine';
+import type { ProblemModel, StepValidationResult, ValidationContext, ValidationResult } from '../lib/validation-engine';
+import { validateStep } from '../lib/validation-engine';
 import { ProblemView } from './ProblemView';
 import { StepsHistory } from './StepsHistory';
 import { UserInput } from './UserInput';
@@ -264,7 +265,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
         };
 
         // Validate the step
-        const result = validateStep(context);
+        		const result = validateStep(context);
         
         // Current step index is based on how many steps have been completed
         // For correct steps, this will be the new step number

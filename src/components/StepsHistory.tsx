@@ -55,6 +55,7 @@ export function StepsHistory({
 				const stepNumber = index + 1;
 				const isLastStep = index === steps.length - 1;
 				const isFinalAnswer = isSolved && isLastStep;
+				const isCurrentStep = isLastStep; // Only the most recent step should show feedback directly
 				const stepAttempts = attemptsByStep[stepNumber] || [];
 
 				// Get structured feedback for this step
@@ -111,8 +112,8 @@ export function StepsHistory({
 										<p className="font-mono text-gray-800 mb-1">
 											{attempt.input}
 										</p>
-										{/* Show feedback directly in the attempt bubble */}
-										{attempt.feedback && (
+										{/* Show feedback directly in the attempt bubble - only for current step and only if no correct step feedback */}
+										{attempt.feedback && isCurrentStep && !(correctAttempt?.feedback && correctAttempt.feedback !== 'Getting feedback...') && (
 											<p className="text-sm text-red-600 mt-2 p-2 bg-red-100 rounded border">
 												{attempt.feedback}
 											</p>
@@ -172,8 +173,8 @@ export function StepsHistory({
 										</p>
 									)}
 									
-									{/* Show feedback directly within the correct step bubble */}
-									{correctAttempt?.feedback && correctAttempt.feedback !== 'Getting feedback...' && (
+									{/* Show feedback directly within the correct step bubble - only for current step */}
+									{isCurrentStep && correctAttempt?.feedback && correctAttempt.feedback !== 'Getting feedback...' && (
 										<div className="mt-3 p-3 bg-green-100 rounded border border-green-300">
 											<p className="text-sm text-green-700">
 												{correctAttempt.feedback}
@@ -181,8 +182,8 @@ export function StepsHistory({
 										</div>
 									)}
 									
-									{/* Show loading state */}
-									{correctAttempt?.feedback === 'Getting feedback...' && (
+									{/* Show loading state - only for current step */}
+									{isCurrentStep && correctAttempt?.feedback === 'Getting feedback...' && (
 										<div className="mt-3 p-3 bg-gray-100 rounded border border-gray-300">
 											<p className="text-sm text-gray-600 flex items-center">
 												<svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -196,8 +197,8 @@ export function StepsHistory({
 									)}
 								</div>
 								
-								{/* Feedback history toggle button - only show if there are multiple feedback entries */}
-								{hasFeedback && stepFeedback.length > 1 && !isFinalAnswer && (
+								{/* Feedback history toggle button - show for any feedback on previous steps, or multiple feedback on current step */}
+								{hasFeedback && (!isCurrentStep || stepFeedback.length > 1) && (
 									<button
 										type="button"
 										onClick={() => toggleStepFeedback(stepNumber)}
@@ -222,16 +223,49 @@ export function StepsHistory({
 								)}
 							</div>
 
-							{/* Display historical feedback for this step if expanded */}
-							{hasFeedback && stepFeedback.length > 1 && (isFinalAnswer || isExpanded) && (
+							{/* Display feedback for this step if expanded */}
+							{(hasFeedback || stepAttempts.length > 0) && isExpanded && (
 								<div className="mt-3 pt-3 border-t border-gray-200">
 									<p className="text-sm font-medium text-gray-600 mb-2">
-										Previous feedback:
+										{isCurrentStep ? 'Previous feedback:' : 'All attempts & feedback:'}
 									</p>
 									<div className="space-y-2">
-										{stepFeedback
+										{/* For previous steps: show all attempts and feedback */}
+										{!isCurrentStep && stepAttempts.map((attempt, attemptIndex) => {
+											const isCorrectAttempt = attempt.isCorrect;
+											const bgColor = isCorrectAttempt ? 'bg-green-50' : 'bg-red-50';
+											const borderColor = isCorrectAttempt ? 'border-green-200' : 'border-red-200';
+											const textColor = isCorrectAttempt ? 'text-green-700' : 'text-red-700';
+											const label = isCorrectAttempt ? 'Correct' : 'Incorrect';
+											
+											return (
+												<div
+													key={`accordion-attempt-${stepNumber}-${attempt.timestamp.getTime()}-${attemptIndex}`}
+													className={`p-3 rounded-lg border ${bgColor} ${borderColor}`}
+												>
+													<div className="flex items-start">
+														<span className={`text-xs font-medium ${textColor} mr-2 mt-0.5`}>
+															{label}
+														</span>
+														<div className="flex-1">
+															<p className="text-sm font-mono text-gray-800 mb-1">
+																{attempt.input}
+															</p>
+															{attempt.feedback && (
+																<p className="text-sm text-gray-700">
+																	{attempt.feedback}
+																</p>
+															)}
+														</div>
+													</div>
+												</div>
+											);
+										})}
+										
+										{/* For current step: show previous feedback from feedbackHistory (excluding most recent) */}
+										{isCurrentStep && stepFeedback
 											.sort((a, b) => a.order - b.order) // Ensure proper ordering
-											.slice(0, -1) // Don't show the most recent feedback since it's already shown above
+											.filter((feedback, index, array) => index < array.length - 1) // Exclude most recent
 											.map((feedback) => {
 												// Style feedback based on validation result
 												const isSuccess = feedback.validationResult === 'CORRECT_FINAL_STEP' || 
