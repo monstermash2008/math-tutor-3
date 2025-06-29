@@ -40,17 +40,16 @@ interface AppState {
 
 // State actions
 type AppAction =
-	| { type: "CHECK_STEP_START" }
+	| { type: "CHECK_STEP_START"; payload: { step: string } }
 	| {
 			type: "CHECK_STEP_SUCCESS";
 			payload: {
-				step: string;
 				message: string;
 				feedbackStatus: FeedbackStatus;
 			};
 	  }
-	| { type: "CHECK_STEP_ERROR"; payload: { step: string; message: string } }
-	| { type: "PROBLEM_SOLVED"; payload: { step: string; message: string } }
+	| { type: "CHECK_STEP_ERROR"; payload: { message: string } }
+	| { type: "PROBLEM_SOLVED"; payload: { message: string } }
 	| {
 			type: "LLM_FEEDBACK_SUCCESS";
 			payload: {
@@ -102,70 +101,101 @@ function addFeedbackToHistory(
 // State reducer
 function appReducer(state: AppState, action: AppAction): AppState {
 	switch (action.type) {
-		case "CHECK_STEP_START":
+		case "CHECK_STEP_START": {
+			// Optimistic update: immediately add step with loading feedback
+			const optimisticAttempt: StudentAttempt = {
+				input: action.payload.step,
+				isCorrect: false, // Will be updated when validation completes
+				feedback: "Validating...", // Loading state feedback
+				timestamp: new Date(),
+				stepNumber: state.allAttempts.length,
+			};
+
 			return {
 				...state,
+				allAttempts: [...state.allAttempts, optimisticAttempt],
 				currentStatus: "checking",
 				feedbackStatus: "loading",
 				feedbackMessage: "Checking your answer...",
 			};
+		}
 
 		case "CHECK_STEP_SUCCESS": {
-			const successAttempt: StudentAttempt = {
-				input: action.payload.step,
-				isCorrect: true,
-				feedback: action.payload.message,
-				timestamp: new Date(),
-				stepNumber: state.userHistory.length,
-			};
+			// Update the most recent attempt with success feedback
+			const updatedAttempts = [...state.allAttempts];
+			const lastAttemptIndex = updatedAttempts.length - 1;
+			
+			if (lastAttemptIndex >= 0) {
+				const lastAttempt = updatedAttempts[lastAttemptIndex];
+				updatedAttempts[lastAttemptIndex] = {
+					...lastAttempt,
+					isCorrect: true,
+					feedback: action.payload.message,
+				};
 
-			return {
-				...state,
-				userHistory: [...state.userHistory, action.payload.step],
-				allAttempts: [...state.allAttempts, successAttempt],
-				currentStatus: "awaiting_next_step",
-				feedbackStatus: action.payload.feedbackStatus,
-				feedbackMessage: action.payload.message,
-				consecutiveFailures: 0, // Reset on success
-			};
+				// Add to userHistory only for correct steps
+				return {
+					...state,
+					userHistory: [...state.userHistory, lastAttempt.input],
+					allAttempts: updatedAttempts,
+					currentStatus: "awaiting_next_step",
+					feedbackStatus: action.payload.feedbackStatus,
+					feedbackMessage: action.payload.message,
+					consecutiveFailures: 0, // Reset on success
+				};
+			}
+
+			return state;
 		}
 
 		case "CHECK_STEP_ERROR": {
-			const errorAttempt: StudentAttempt = {
-				input: action.payload.step,
-				isCorrect: false,
-				feedback: action.payload.message, // This will be "Getting feedback..."
-				timestamp: new Date(),
-				stepNumber: state.userHistory.length,
-			};
+			// Update the most recent attempt with error feedback
+			const updatedAttempts = [...state.allAttempts];
+			const lastAttemptIndex = updatedAttempts.length - 1;
+			
+			if (lastAttemptIndex >= 0) {
+				updatedAttempts[lastAttemptIndex] = {
+					...updatedAttempts[lastAttemptIndex],
+					isCorrect: false,
+					feedback: action.payload.message,
+				};
+			}
 
 			return {
 				...state,
-				allAttempts: [...state.allAttempts, errorAttempt],
+				allAttempts: updatedAttempts,
 				currentStatus: "awaiting_next_step",
-				feedbackStatus: "loading",
+				feedbackStatus: "error",
 				feedbackMessage: action.payload.message,
 			};
 		}
 
 		case "PROBLEM_SOLVED": {
-			const solvedAttempt: StudentAttempt = {
-				input: action.payload.step,
-				isCorrect: true,
-				feedback: action.payload.message,
-				timestamp: new Date(),
-				stepNumber: state.userHistory.length,
-			};
+			// Update the most recent attempt and mark as solved
+			const updatedAttempts = [...state.allAttempts];
+			const lastAttemptIndex = updatedAttempts.length - 1;
+			
+			if (lastAttemptIndex >= 0) {
+				const lastAttempt = updatedAttempts[lastAttemptIndex];
+				updatedAttempts[lastAttemptIndex] = {
+					...lastAttempt,
+					isCorrect: true,
+					feedback: action.payload.message,
+				};
 
-			return {
-				...state,
-				userHistory: [...state.userHistory, action.payload.step],
-				allAttempts: [...state.allAttempts, solvedAttempt],
-				currentStatus: "solved",
-				feedbackStatus: "success",
-				feedbackMessage: action.payload.message,
-				consecutiveFailures: 0, // Reset on completion
-			};
+				// Add to userHistory for the final correct step
+				return {
+					...state,
+					userHistory: [...state.userHistory, lastAttempt.input],
+					allAttempts: updatedAttempts,
+					currentStatus: "solved",
+					feedbackStatus: "success",
+					feedbackMessage: action.payload.message,
+					consecutiveFailures: 0, // Reset on completion
+				};
+			}
+
+			return state;
 		}
 
 		case "LLM_FEEDBACK_SUCCESS": {
@@ -301,7 +331,8 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 
 	// Handle step validation using backend
 	const handleCheckStep = async (studentInput: string) => {
-		dispatch({ type: "CHECK_STEP_START" });
+		// Optimistically add the step immediately
+		dispatch({ type: "CHECK_STEP_START", payload: { step: studentInput } });
 		dispatch({ type: "RESET_FEEDBACK" });
 
 		try {
@@ -335,7 +366,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 				case "CORRECT_FINAL_STEP":
 					dispatch({
 						type: "PROBLEM_SOLVED",
-						payload: { step: studentInput, message: feedback },
+						payload: { message: feedback },
 					});
 					break;
 
@@ -344,7 +375,6 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 					dispatch({
 						type: "CHECK_STEP_SUCCESS",
 						payload: {
-							step: studentInput,
 							message: feedback,
 							feedbackStatus: "success",
 						},
@@ -356,7 +386,6 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 					dispatch({
 						type: "CHECK_STEP_ERROR",
 						payload: {
-							step: studentInput,
 							message: feedback,
 						},
 					});
@@ -368,7 +397,6 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 					dispatch({
 						type: "CHECK_STEP_ERROR",
 						payload: {
-							step: studentInput,
 							message: feedback,
 						},
 					});
@@ -378,7 +406,6 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 					dispatch({
 						type: "CHECK_STEP_ERROR",
 						payload: {
-							step: studentInput,
 							message: "Something unexpected happened. Please try again.",
 						},
 					});
@@ -403,7 +430,6 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 			dispatch({
 				type: "CHECK_STEP_ERROR",
 				payload: {
-					step: studentInput,
 					message:
 						"Unable to validate your answer right now. Please try again.",
 				},

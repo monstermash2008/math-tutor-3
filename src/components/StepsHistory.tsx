@@ -33,7 +33,9 @@ export function StepsHistory({
 
 			// Auto-expand current step attempts that have feedback
 			currentStepAttempts.forEach((attempt, attemptIndex) => {
-				if (attempt.feedback && attempt.feedback !== "Getting feedback...") {
+				if (attempt.feedback && 
+					attempt.feedback !== "Getting feedback..." && 
+					attempt.feedback !== "Validating...") {
 					const attemptId = `current-attempt-${attempt.timestamp.getTime()}-${attemptIndex}`;
 					expanded.add(attemptId);
 				}
@@ -65,7 +67,9 @@ export function StepsHistory({
 				let hasNewExpansions = false;
 
 				currentStepAttempts.forEach((attempt, attemptIndex) => {
-					if (attempt.feedback && attempt.feedback !== "Getting feedback...") {
+					if (attempt.feedback && 
+						attempt.feedback !== "Getting feedback..." && 
+						attempt.feedback !== "Validating...") {
 						const attemptId = `current-attempt-${attempt.timestamp.getTime()}-${attemptIndex}`;
 						if (!newExpandedAttempts.has(attemptId)) {
 							newExpandedAttempts.add(attemptId);
@@ -163,7 +167,8 @@ export function StepsHistory({
 								const attemptId = `attempt-${stepNumber}-${attempt.timestamp.getTime()}-${attemptIndex}`;
 								const hasFeedback =
 									attempt.feedback &&
-									attempt.feedback !== "Getting feedback...";
+									attempt.feedback !== "Getting feedback..." &&
+									attempt.feedback !== "Validating...";
 								const isAttemptExpanded = expandedAttempts.has(attemptId);
 
 								return (
@@ -196,11 +201,33 @@ export function StepsHistory({
 												</p>
 
 												{/* Show loading state for current step */}
-												{attempt.feedback === "Getting feedback..." &&
+												{(attempt.feedback === "Getting feedback..." || 
+													attempt.feedback === "Validating...") &&
 													isCurrentStep && (
-														<p className="text-sm text-red-600 mt-2 p-2 bg-red-100 rounded border">
+														<div className="text-sm text-red-600 mt-2 p-2 bg-red-100 rounded border flex items-center">
+															<svg
+																className="animate-spin -ml-1 mr-2 h-4 w-4 text-red-600"
+																xmlns="http://www.w3.org/2000/svg"
+																fill="none"
+																viewBox="0 0 24 24"
+															>
+																<title>Loading spinner</title>
+																<circle
+																	className="opacity-25"
+																	cx="12"
+																	cy="12"
+																	r="10"
+																	stroke="currentColor"
+																	strokeWidth="4"
+																/>
+																<path
+																	className="opacity-75"
+																	fill="currentColor"
+																	d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+																/>
+															</svg>
 															{attempt.feedback}
-														</p>
+														</div>
 													)}
 
 												{/* Show feedback in accordion format for attempts with feedback */}
@@ -304,7 +331,8 @@ export function StepsHistory({
 									{/* Show feedback directly within the correct step bubble - only for current step */}
 									{isCurrentStep &&
 										correctAttempt?.feedback &&
-										correctAttempt.feedback !== "Getting feedback..." && (
+										correctAttempt.feedback !== "Getting feedback..." &&
+										correctAttempt.feedback !== "Validating..." && (
 											<div className="mt-3 p-3 bg-green-100 rounded border border-green-300">
 												<p className="text-sm text-green-700">
 													{correctAttempt.feedback}
@@ -314,7 +342,8 @@ export function StepsHistory({
 
 									{/* Show loading state - only for current step */}
 									{isCurrentStep &&
-										correctAttempt?.feedback === "Getting feedback..." && (
+										(correctAttempt?.feedback === "Getting feedback..." ||
+										correctAttempt?.feedback === "Validating...") && (
 											<div className="mt-3 p-3 bg-gray-100 rounded border border-gray-300">
 												<p className="text-sm text-gray-600 flex items-center">
 													<svg
@@ -338,7 +367,7 @@ export function StepsHistory({
 															d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 														/>
 													</svg>
-													Getting feedback...
+													{correctAttempt?.feedback || "Processing..."}
 												</p>
 											</div>
 										)}

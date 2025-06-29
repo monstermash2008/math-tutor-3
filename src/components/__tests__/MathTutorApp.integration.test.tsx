@@ -1,8 +1,47 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ProblemModel } from "../../lib/validation-engine";
 import { MathTutorApp } from "../MathTutorApp";
+
+// Mock Convex useAction hook
+vi.mock("convex/react", async () => {
+	const actual = await vi.importActual("convex/react");
+	return {
+		...actual,
+		useAction: vi.fn(() => {
+			return vi.fn().mockImplementation((args) => {
+				const { studentInput } = args;
+				// Mock validation logic - correct steps for the sample problem
+				const correctSteps = ["3x + 3 = 12", "3x = 9", "x = 3"];
+				const isCorrect = correctSteps.includes(studentInput);
+				
+				// Return the format expected by the component
+				return Promise.resolve({
+					result: isCorrect 
+						? (studentInput === "x = 3" ? "CORRECT_FINAL_STEP" : "CORRECT_INTERMEDIATE_STEP")
+						: "EQUIVALENCE_FAILURE",
+					isCorrect,
+					shouldAdvance: isCorrect,
+					feedback: isCorrect 
+						? "Great job! That's the correct step." 
+						: "This step is incorrect. Try again.",
+					processingTimeMs: 50,
+					llmFeedback: {
+						encouragement: isCorrect ? "Excellent work!" : "Keep trying!",
+						explanation: isCorrect 
+							? "You correctly simplified the equation." 
+							: "This step doesn't follow from the previous one.",
+						nextHint: "Try to isolate the variable."
+					}
+				});
+			});
+		}),
+		ConvexProvider: ({ children }: { children: React.ReactNode }) => {
+			return <div data-testid="mock-convex-provider">{children}</div>;
+		}
+	};
+});
 
 describe("MathTutorApp - Phase 3 Integration Tests", () => {
 	const sampleProblem: ProblemModel = {
@@ -15,7 +54,7 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 		timesAttempted: 0,
 	};
 
-	// Helper to render with QueryClient
+	// Helper to render with QueryClient and ConvexProvider
 	const renderWithQueryClient = (component: React.ReactElement) => {
 		const queryClient = new QueryClient({
 			defaultOptions: {
@@ -23,9 +62,14 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 				mutations: { retry: false },
 			},
 		});
+		// Import mocked ConvexProvider
+		const { ConvexProvider } = require("convex/react");
+		
 		return render(
 			<QueryClientProvider client={queryClient}>
-				{component}
+				<ConvexProvider client={null}>
+					{component}
+				</ConvexProvider>
 			</QueryClientProvider>,
 		);
 	};
@@ -55,12 +99,12 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			fireEvent.change(input, { target: { value: "3x + 3 = 12" } });
 			fireEvent.click(checkButton);
 
-			// Wait for async processing to complete and step to appear with feedback
+			// Wait for backend validation to complete and step to appear with feedback
 			await waitFor(
 				() => {
 					expect(screen.getByText("3x + 3 = 12")).toBeInTheDocument();
-					expect(screen.getAllByText("Getting feedback...")).toHaveLength(1); // Only in StepsHistory now
-					expect(screen.getByTitle("Loading spinner")).toBeInTheDocument();
+					expect(screen.getByText("Great job! That's the correct step.")).toBeInTheDocument();
+					expect(screen.getByText("Step 2:")).toBeInTheDocument(); // Should advance to next step
 				},
 				{ timeout: 1000 },
 			);
@@ -68,7 +112,7 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 	});
 
 	describe("Async Validation Flow", () => {
-		it("should process correct step after delay", async () => {
+		it("should process correct step with backend validation", async () => {
 			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
 
 			const input = screen.getByRole("textbox");
@@ -78,19 +122,15 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			fireEvent.change(input, { target: { value: "3x + 3 = 12" } });
 			fireEvent.click(checkButton);
 
-			// Wait for async processing to complete
-			// In Phase 4, LLM feedback is requested but in test environment without API key,
-			// the mutation gets stuck in loading state
+			// Wait for backend validation to complete
 			await waitFor(
 				() => {
-					expect(screen.getAllByText("Getting feedback...")).toHaveLength(1); // Only in StepsHistory now
+					expect(screen.getByText("3x + 3 = 12")).toBeInTheDocument();
+					expect(screen.getByText("Great job! That's the correct step.")).toBeInTheDocument();
+					expect(screen.getByText("Step 2:")).toBeInTheDocument();
 				},
 				{ timeout: 1000 },
 			);
-
-			// Verify step was added to history
-			expect(screen.getByText("3x + 3 = 12")).toBeInTheDocument();
-			expect(screen.getByText("Step 2:")).toBeInTheDocument();
 		}, 2000);
 	});
 
@@ -105,12 +145,12 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			fireEvent.change(input, { target: { value: "7x = 9" } });
 			fireEvent.click(checkButton);
 
-			// Wait for incorrect attempt to appear in the UI
+			// Wait for incorrect attempt to appear in the UI with backend feedback
 			await waitFor(
 				() => {
 					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
 					expect(screen.getByText("7x = 9")).toBeInTheDocument();
-					expect(screen.getAllByText("Getting feedback...")).toHaveLength(1); // Only in StepsHistory now
+					expect(screen.getByText("This step is incorrect. Try again.")).toBeInTheDocument();
 				},
 				{ timeout: 1000 },
 			);
@@ -131,12 +171,12 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			fireEvent.change(input, { target: { value: "3x ++ 5 = 12" } });
 			fireEvent.click(checkButton);
 
-			// Wait for incorrect attempt to appear with loading feedback
+			// Wait for incorrect attempt to appear with backend feedback
 			await waitFor(
 				() => {
 					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
 					expect(screen.getByText("3x ++ 5 = 12")).toBeInTheDocument();
-					expect(screen.getAllByText("Getting feedback...")).toHaveLength(1); // Only in StepsHistory now
+					expect(screen.getByText("This step is incorrect. Try again.")).toBeInTheDocument();
 				},
 				{ timeout: 1000 },
 			);
@@ -203,7 +243,7 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			expect(hintButton).not.toBeDisabled();
 		}, 3000);
 
-		it("should show hint button loading state only when hint is clicked", async () => {
+		it("should show hint functionality when hint button is clicked", async () => {
 			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
 
 			const input = screen.getByRole("textbox");
@@ -224,7 +264,7 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 				);
 			}
 
-			// Hint button should now be visible and not in loading state initially
+			// Hint button should now be visible
 			const hintButton = await waitFor(
 				() => {
 					return screen.getByRole("button", { name: /i'm stuck/i });
@@ -239,12 +279,13 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			// Click the hint button
 			fireEvent.click(hintButton);
 
-			// NOW it should show loading state immediately after click
-			expect(hintButton).toHaveTextContent("Getting hint...");
-			expect(hintButton).toBeDisabled();
-
-			// Note: In test environment without LLM API, the mutation gets stuck in loading state
-			// This is expected behavior - we've verified the loading state works correctly
+			// Verify hint message appears (current implementation shows a placeholder message)
+			await waitFor(
+				() => {
+					expect(screen.getByText("Hint functionality will be available soon!")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
 		}, 3000);
 	});
 });
