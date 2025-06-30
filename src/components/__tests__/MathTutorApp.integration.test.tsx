@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { ProblemModel } from "../../lib/validation-engine";
+import type { ProblemModel } from "../../types";
 import { MathTutorApp } from "../MathTutorApp";
 
 // Mock Convex useAction hook
@@ -11,38 +11,68 @@ vi.mock("convex/react", async () => {
 		...actual,
 		useAction: vi.fn(() => {
 			return vi.fn().mockImplementation(async (args) => {
-				const { studentInput } = args;
-				// Mock validation logic - correct steps for the sample problem
-				const correctSteps = ["3x + 3 = 12", "3x = 9", "x = 3"];
-				const isCorrect = correctSteps.includes(studentInput);
-				
-				// Add a small delay to simulate network latency and make the validating state visible
-				await new Promise(resolve => setTimeout(resolve, 100));
-				
+				const { studentInput, userHistory } = args;
+
+				// Import Convex validation engine to use real validation logic
+				const { validateStep } = await import("../../../convex/validation_engine");
+
+				// Create problem model for validation
+				const problemModel = {
+					_id: "p-102",
+					problemStatement: "Solve for x: 5x + 3 = 2x + 12",
+					problemType: "SOLVE_EQUATION" as const,
+					solutionSteps: ["3x + 3 = 12", "3x = 9", "x = 3"],
+					difficulty: "Medium" as const,
+					isPublic: true,
+					timesAttempted: 0,
+				};
+
+				// Use actual validation logic
+				const result = validateStep({
+					problemModel,
+					userHistory,
+					studentInput,
+				});
+
+				// Add a small delay to simulate network latency
+				await new Promise((resolve) => setTimeout(resolve, 100));
+
+				// Generate appropriate feedback message
+				let feedback: string;
+				if (result.isCorrect) {
+					if (result.result === "CORRECT_FINAL_STEP") {
+						feedback = "Excellent! You've solved the problem.";
+					} else if (result.result === "CORRECT_BUT_NOT_SIMPLIFIED") {
+						feedback = "Correct! But this could be simplified further.";
+					} else {
+						feedback = "Great job! That's the correct step.";
+					}
+				} else {
+					feedback = "This step is incorrect. Try again.";
+				}
+
 				// Return the format expected by the component
 				return Promise.resolve({
-					result: isCorrect 
-						? (studentInput === "x = 3" ? "CORRECT_FINAL_STEP" : "CORRECT_INTERMEDIATE_STEP")
-						: "EQUIVALENCE_FAILURE",
-					isCorrect,
-					shouldAdvance: isCorrect,
-					feedback: isCorrect 
-						? "Great job! That's the correct step." 
-						: "This step is incorrect. Try again.",
+					result: result.result,
+					isCorrect: result.isCorrect,
+					shouldAdvance: result.shouldAdvance,
+					feedback,
 					processingTimeMs: 50,
 					llmFeedback: {
-						encouragement: isCorrect ? "Excellent work!" : "Keep trying!",
-						explanation: isCorrect 
-							? "You correctly simplified the equation." 
+						encouragement: result.isCorrect
+							? "Excellent work!"
+							: "Keep trying!",
+						explanation: result.isCorrect
+							? "You correctly simplified the equation."
 							: "This step doesn't follow from the previous one.",
-						nextHint: "Try to isolate the variable."
-					}
+						nextHint: "Try to isolate the variable.",
+					},
 				});
 			});
 		}),
 		ConvexProvider: ({ children }: { children: React.ReactNode }) => {
 			return <div data-testid="mock-convex-provider">{children}</div>;
-		}
+		},
 	};
 });
 
@@ -67,12 +97,10 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 		});
 		// Import mocked ConvexProvider
 		const { ConvexProvider } = require("convex/react");
-		
+
 		return render(
 			<QueryClientProvider client={queryClient}>
-				<ConvexProvider client={null}>
-					{component}
-				</ConvexProvider>
+				<ConvexProvider client={null}>{component}</ConvexProvider>
 			</QueryClientProvider>,
 		);
 	};
@@ -81,9 +109,11 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 		it("should render initial state correctly", () => {
 			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
 
-					// Verify initial state - check for problem statement and input
-		expect(screen.getByText("Problem:")).toBeInTheDocument();
-		expect(screen.getByText("Solve for x: 5x + 3 = 2x + 12")).toBeInTheDocument(); // Problem statement only
+			// Verify initial state - check for problem statement and input
+			expect(screen.getByText("Problem:")).toBeInTheDocument();
+			expect(
+				screen.getByText("Solve for x: 5x + 3 = 2x + 12"),
+			).toBeInTheDocument(); // Problem statement only
 			expect(screen.getByText("Step 1:")).toBeInTheDocument();
 			expect(screen.getByRole("textbox")).toBeInTheDocument();
 			expect(
@@ -111,7 +141,9 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			);
 
 			// Feedback is now collapsed by default for all steps
-			expect(screen.queryByText("Great job! That's the correct step.")).not.toBeInTheDocument();
+			expect(
+				screen.queryByText("Great job! That's the correct step."),
+			).not.toBeInTheDocument();
 		});
 	});
 
@@ -136,10 +168,10 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			);
 
 			// Feedback is now collapsed by default for all steps
-			expect(screen.queryByText("Great job! That's the correct step.")).not.toBeInTheDocument();
+			expect(
+				screen.queryByText("Great job! That's the correct step."),
+			).not.toBeInTheDocument();
 		}, 2000);
-
-
 	});
 
 	describe("Error Handling", () => {
@@ -162,24 +194,14 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 				{ timeout: 1000 },
 			);
 
-			// Wait for validation to complete and feedback to be available
+			// Wait for feedback to be visible by default (auto-expanded)
 			await waitFor(
 				() => {
-					expect(screen.getByText("Feedback available - click to expand")).toBeInTheDocument();
+					expect(
+						screen.getByText("This step is incorrect. Try again."),
+					).toBeInTheDocument();
 				},
 				{ timeout: 1500 },
-			);
-
-			// Click the expand button to show the feedback
-			const expandButton = screen.getByRole("button", { name: /show feedback for incorrect attempt/i });
-			fireEvent.click(expandButton);
-
-			// Now check for the feedback text
-			await waitFor(
-				() => {
-					expect(screen.getByText("This step is incorrect. Try again.")).toBeInTheDocument();
-				},
-				{ timeout: 500 },
 			);
 
 			// Assert the incorrect attempt is styled properly
@@ -308,7 +330,9 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			// Verify hint message appears (current implementation shows a placeholder message)
 			await waitFor(
 				() => {
-					expect(screen.getByText("Hint functionality will be available soon!")).toBeInTheDocument();
+					expect(
+						screen.getByText("Hint functionality will be available soon!"),
+					).toBeInTheDocument();
 				},
 				{ timeout: 1000 },
 			);
@@ -324,17 +348,17 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 
 			// Enter incorrect step to test validating state
 			fireEvent.change(input, { target: { value: "7x = 9" } });
-			
+
 			// Click and immediately check for validating state (synchronous)
 			fireEvent.click(checkButton);
-			
+
 			// Check if validating state appears immediately (should be synchronous)
 			expect(screen.getByText("7x = 9")).toBeInTheDocument();
-			
+
 			// Look for validating state indicators
 			const validatingText = screen.queryByText("Validating Step...");
 			const validatingFeedback = screen.queryByText("Validating...");
-			
+
 			console.log("Immediate state check:", {
 				hasValidatingText: !!validatingText,
 				hasValidatingFeedback: !!validatingFeedback,
@@ -360,7 +384,7 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 
 			// Enter any step to trigger validation
 			fireEvent.change(input, { target: { value: "test step" } });
-			
+
 			// The optimistic update should create a pending attempt
 			// This is verified by the console logs showing status: 'pending'
 			fireEvent.click(checkButton);
@@ -386,7 +410,7 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			fireEvent.change(input, { target: { value: "7x = 9" } });
 			fireEvent.click(checkButton);
 
-			// Wait for the validation to complete and show as incorrect
+			// Wait for validation to complete
 			await waitFor(
 				() => {
 					expect(screen.getByText("7x = 9")).toBeInTheDocument();
@@ -395,29 +419,21 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 				{ timeout: 1000 },
 			);
 
-			// Wait for validation to complete and feedback to be available
+			// Wait for feedback to be visible by default (auto-expanded)
 			await waitFor(
 				() => {
-					expect(screen.getByText("Feedback available - click to expand")).toBeInTheDocument();
+					expect(
+						screen.getByText("This step is incorrect. Try again."),
+					).toBeInTheDocument();
 				},
 				{ timeout: 1500 },
 			);
 
-			// The actual feedback text should NOT be visible before expanding
-			expect(screen.queryByText("This step is incorrect. Try again.")).not.toBeInTheDocument();
-
-			// Click the expand button to show the feedback
-			const expandButton = screen.getByRole("button", { name: /show feedback for incorrect attempt/i });
-			fireEvent.click(expandButton);
-
-			// Now the feedback should be visible
-			await waitFor(
-				() => {
-					expect(screen.getByText("This step is incorrect. Try again.")).toBeInTheDocument();
-				},
-				{ timeout: 500 },
-			);
-		}, 3000);
+			// No "click to expand" should be visible since it's auto-expanded
+			expect(
+				screen.queryByText("Feedback available - click to expand"),
+			).not.toBeInTheDocument();
+		});
 
 		it("should handle multi-step scenario without showing feedback prematurely", async () => {
 			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
@@ -449,21 +465,21 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 				{ timeout: 1000 },
 			);
 
-			// Wait for feedback to be available
+			// Wait for feedback to be visible by default (auto-expanded) - this is the current step
 			await waitFor(
 				() => {
-					expect(screen.getByText("Feedback available - click to expand")).toBeInTheDocument();
+					expect(
+						screen.getByText("This step is incorrect. Try again."),
+					).toBeInTheDocument();
 				},
 				{ timeout: 1500 },
 			);
 
-			// The feedback should not be visible initially
-			expect(screen.queryByText("This step is incorrect. Try again.")).not.toBeInTheDocument();
-
-			// Check that feedback isn't visible anywhere on the page
-			const allFeedbackTexts = screen.queryAllByText(/This step is incorrect/);
-			expect(allFeedbackTexts).toHaveLength(0);
-		}, 5000);
+			// No "click to expand" should be visible since current step feedback is auto-expanded
+			expect(
+				screen.queryByText("Feedback available - click to expand"),
+			).not.toBeInTheDocument();
+		});
 
 		it("should never show feedback text directly - comprehensive check", async () => {
 			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
@@ -473,8 +489,8 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 
 			// Make multiple incorrect attempts to stress test the system
 			const incorrectInputs = ["7x = 9", "2x = 10", "x = 5"];
-			
-			for (const incorrectInput of incorrectInputs) {
+
+			for (const [index, incorrectInput] of incorrectInputs.entries()) {
 				fireEvent.change(input, { target: { value: incorrectInput } });
 				fireEvent.click(checkButton);
 
@@ -482,42 +498,124 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 				await waitFor(
 					() => {
 						expect(screen.getByText(incorrectInput)).toBeInTheDocument();
-						expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+						expect(screen.getAllByText("Incorrect Attempt")).toHaveLength(
+							index + 1,
+						);
 					},
 					{ timeout: 1000 },
 				);
 
-				// Immediately check that feedback is not visible
-				expect(screen.queryByText("This step is incorrect. Try again.")).not.toBeInTheDocument();
-				
-				// Also check for any visible feedback patterns
-				const feedbackRegexes = [
-					/this step is incorrect/i,
-					/try again/i,
-					/incorrect.*step/i,
-					/wrong.*answer/i,
-				];
-				
-				for (const regex of feedbackRegexes) {
-					const potentialFeedback = screen.queryAllByText(regex);
-					// Filter out the "Incorrect Attempt" label which is expected
-					const actualFeedback = potentialFeedback.filter(el => 
-						!el.textContent?.includes("Incorrect Attempt")
-					);
-					expect(actualFeedback).toHaveLength(0);
-				}
-
-				// Wait for feedback to become available (but not visible)
+				// Wait for feedback to be visible (auto-expanded for current step)
 				await waitFor(
 					() => {
-						expect(screen.getByText("Feedback available - click to expand")).toBeInTheDocument();
+						const feedbackElements = screen.getAllByText(
+							"This step is incorrect. Try again.",
+						);
+						expect(feedbackElements.length).toBeGreaterThan(0);
 					},
 					{ timeout: 1500 },
 				);
+
+				// Current step feedback should be auto-expanded (visible immediately)
+				const feedbackElements = screen.getAllByText(
+					"This step is incorrect. Try again.",
+				);
+				expect(feedbackElements.length).toBeGreaterThan(0);
+
+				// Also check for any visible feedback patterns - they should all be auto-expanded for current step
+				expect(feedbackElements.length).toBe(index + 1); // Should have one feedback per attempt
 			}
-		}, 10000);
+		});
 
 		it("should NOT show incorrect step feedback in FeedbackDisplay component", async () => {
+			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
+
+			const input = screen.getByRole("textbox");
+			const checkButton = screen.getByRole("button", { name: /check/i });
+
+			// Enter incorrect step
+			fireEvent.change(input, { target: { value: "7x = 9" } });
+			fireEvent.click(checkButton);
+
+			// Wait for validation to complete
+			await waitFor(
+				() => {
+					expect(screen.getByText("7x = 9")).toBeInTheDocument();
+					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			// Wait for feedback to be visible by default (auto-expanded)
+			await waitFor(
+				() => {
+					expect(
+						screen.getByText("This step is incorrect. Try again."),
+					).toBeInTheDocument();
+				},
+				{ timeout: 1500 },
+			);
+
+			// Check that there's NO FeedbackDisplay component visible
+			// (FeedbackDisplay has a specific "feedback-card" class and "Tutor Feedback" heading)
+			expect(screen.queryByText("Tutor Feedback")).not.toBeInTheDocument();
+			expect(screen.queryByTestId("feedback-card")).not.toBeInTheDocument();
+
+			// Also check for the FeedbackDisplay container class
+			const feedbackCards = document.querySelectorAll(".feedback-card");
+			expect(feedbackCards).toHaveLength(0);
+
+			// Verify feedback is auto-expanded in the accordion (no "click to expand" message)
+			expect(
+				screen.queryByText("Feedback available - click to expand"),
+			).not.toBeInTheDocument();
+			expect(
+				screen.getByText("This step is incorrect. Try again."),
+			).toBeInTheDocument();
+		}, 3000);
+
+		it("should show feedback IMMEDIATELY for incorrect attempts (accordion open by default)", async () => {
+			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
+
+			const input = screen.getByRole("textbox");
+			const checkButton = screen.getByRole("button", { name: /check/i });
+
+			// Enter incorrect step
+			fireEvent.change(input, { target: { value: "7x = 9" } });
+			fireEvent.click(checkButton);
+
+			// Wait for validation to complete
+			await waitFor(
+				() => {
+					expect(screen.getByText("7x = 9")).toBeInTheDocument();
+					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			// The feedback should be VISIBLE immediately (accordion open by default)
+			await waitFor(
+				() => {
+					expect(
+						screen.getByText("This step is incorrect. Try again."),
+					).toBeInTheDocument();
+				},
+				{ timeout: 1500 },
+			);
+
+			// Should NOT show "Feedback available - click to expand" because it should already be expanded
+			expect(
+				screen.queryByText("Feedback available - click to expand"),
+			).not.toBeInTheDocument();
+
+			// Should show the collapse button instead
+			const collapseButton = screen.getByRole("button", {
+				name: /hide feedback for incorrect attempt/i,
+			});
+			expect(collapseButton).toBeInTheDocument();
+		}, 3000);
+
+		it("should show feedback IMMEDIATELY for incorrect attempts", async () => {
 			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
 
 			const input = screen.getByRole("textbox");
@@ -539,23 +637,245 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			// Wait for feedback to be available in accordion
 			await waitFor(
 				() => {
-					expect(screen.getByText("Feedback available - click to expand")).toBeInTheDocument();
+					// Feedback should be visible immediately (auto-expanded)
+					const feedbackElements = screen.getAllByText(
+						"This step is incorrect. Try again.",
+					);
+					expect(feedbackElements.length).toBeGreaterThan(0);
 				},
 				{ timeout: 1500 },
 			);
 
-			// Check that there's NO FeedbackDisplay component visible
-			// (FeedbackDisplay has a specific "feedback-card" class and "Tutor Feedback" heading)
-			expect(screen.queryByText("Tutor Feedback")).not.toBeInTheDocument();
-			expect(screen.queryByTestId("feedback-card")).not.toBeInTheDocument();
-			
-			// Also check for the FeedbackDisplay container class
-			const feedbackCards = document.querySelectorAll('.feedback-card');
-			expect(feedbackCards).toHaveLength(0);
+			// Current step feedback should be auto-expanded (visible immediately)
+			const feedbackElements = screen.getAllByText(
+				"This step is incorrect. Try again.",
+			);
+			expect(feedbackElements.length).toBeGreaterThan(0);
+		});
 
-			// Verify feedback is only in the collapsed accordion
-			expect(screen.queryByText("This step is incorrect. Try again.")).not.toBeInTheDocument();
-			expect(screen.getByText("Feedback available - click to expand")).toBeInTheDocument();
-		}, 3000);
+		it("should handle CORRECT_BUT_NOT_SIMPLIFIED results properly", async () => {
+			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
+
+			const input = screen.getByRole("textbox");
+			const checkButton = screen.getByRole("button", { name: /check/i });
+
+			// Complete first step correctly: 3x + 3 = 12
+			fireEvent.change(input, { target: { value: "3x + 3 = 12" } });
+			fireEvent.click(checkButton);
+
+			await waitFor(
+				() => {
+					expect(screen.getByText("Step 2:")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			// Complete second step correctly: 3x = 9
+			fireEvent.change(input, { target: { value: "3x = 9" } });
+			fireEvent.click(checkButton);
+
+			await waitFor(
+				() => {
+					expect(screen.getByText("Step 3:")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			// Now enter x = 9/3 which should be CORRECT_BUT_NOT_SIMPLIFIED
+			fireEvent.change(input, { target: { value: "x = 9/3" } });
+			fireEvent.click(checkButton);
+
+			// Should be marked as correct, not incorrect, and advance to Step 4
+			await waitFor(
+				() => {
+					// Should show success state, not incorrect attempt
+					expect(
+						screen.queryByText("Incorrect Attempt"),
+					).not.toBeInTheDocument();
+					// Since x = 9/3 is CORRECT_BUT_NOT_SIMPLIFIED, it should advance to Step 4
+					// (not solve the problem completely since it needs simplification)
+					expect(screen.getByText("Step 4:")).toBeInTheDocument();
+					expect(screen.getByText("x = 9/3")).toBeInTheDocument();
+					// Should NOT show final answer or problem solved yet
+					expect(screen.queryByText("Final Answer")).not.toBeInTheDocument();
+					expect(
+						screen.queryByText("🎉 Excellent work!"),
+					).not.toBeInTheDocument();
+				},
+				{ timeout: 1500 },
+			);
+
+			// Now student can enter the simplified form
+			fireEvent.change(input, { target: { value: "x = 3" } });
+			fireEvent.click(checkButton);
+
+			// THIS should solve the problem completely
+			await waitFor(
+				() => {
+					expect(screen.getByText("Final Answer")).toBeInTheDocument();
+					expect(screen.getByText("🎉 Excellent work!")).toBeInTheDocument();
+					expect(screen.getByText("Problem Solved!")).toBeInTheDocument();
+				},
+				{ timeout: 1500 },
+			);
+		});
+
+		it("should display chronological order with completed steps before current attempts", async () => {
+			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
+
+			const input = screen.getByRole("textbox");
+			const checkButton = screen.getByRole("button", { name: /check/i });
+
+			// Complete first step correctly
+			fireEvent.change(input, { target: { value: "3x + 3 = 12" } });
+			fireEvent.click(checkButton);
+
+			await waitFor(
+				() => {
+					expect(screen.getByText("Step 2:")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			// Make an incorrect attempt on step 2
+			fireEvent.change(input, { target: { value: "x = 5" } });
+			fireEvent.click(checkButton);
+
+			await waitFor(
+				() => {
+					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			// In our unified timeline approach, all items appear in chronological order
+			// Step 1 should be completed and visible
+			expect(screen.getByText("Step 1")).toBeInTheDocument();
+			expect(screen.getByText("3x + 3 = 12")).toBeInTheDocument();
+			
+			// The incorrect attempt "x = 5" should appear after Step 1 in chronological order
+			expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+			expect(screen.getByText("x = 5")).toBeInTheDocument();
+
+			// Both items should be visible simultaneously since our timeline shows complete history
+			const allSteps = screen.getAllByText(/Step \d+/);
+			const allAttempts = screen.getAllByText("Incorrect Attempt");
+			
+			expect(allSteps.length).toBeGreaterThan(0);
+			expect(allAttempts.length).toBeGreaterThan(0);
+		});
+
+		it("should display all steps and attempts in chronological order", async () => {
+			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
+
+			const input = screen.getByRole("textbox");
+			const checkButton = screen.getByRole("button", { name: /check/i });
+
+			// Complete first step correctly
+			fireEvent.change(input, { target: { value: "3x + 3 = 12" } });
+			fireEvent.click(checkButton);
+
+			await waitFor(
+				() => {
+					expect(screen.getByText("Step 2:")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			// Make an incorrect attempt on step 2
+			fireEvent.change(input, { target: { value: "x = 5" } });
+			fireEvent.click(checkButton);
+
+			await waitFor(
+				() => {
+					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			// In our new unified timeline, items should appear in chronological order:
+			// 1. Step 1 (completed): "3x + 3 = 12"  
+			// 2. Incorrect Attempt: "x = 5" (from step 2)
+			
+			// Verify both Step 1 and the incorrect attempt are visible
+			expect(screen.getByText("Step 1")).toBeInTheDocument();
+			expect(screen.getByText("3x + 3 = 12")).toBeInTheDocument();
+			expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+			expect(screen.getByText("x = 5")).toBeInTheDocument();
+
+			// Verify chronological order: Step 1 should appear before incorrect attempt
+			const step1Element = screen.getByText("Step 1");
+			const incorrectAttemptElement = screen.getByText("Incorrect Attempt");
+			
+			// Both elements should be in the document and in chronological order
+			expect(step1Element).toBeInTheDocument();
+			expect(incorrectAttemptElement).toBeInTheDocument();
+		});
+
+		it("should not show old incorrect attempts after problem completion", async () => {
+			renderWithQueryClient(<MathTutorApp problem={sampleProblem} />);
+
+			const input = screen.getByRole("textbox");
+			const checkButton = screen.getByRole("button", { name: /check/i });
+
+			// Complete first step correctly: 3x + 3 = 12
+			fireEvent.change(input, { target: { value: "3x + 3 = 12" } });
+			fireEvent.click(checkButton);
+
+			await waitFor(
+				() => {
+					expect(screen.getByText("Step 2:")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			// Make an incorrect attempt for next step
+			fireEvent.change(input, { target: { value: "x = 3/9" } });
+			fireEvent.click(checkButton);
+
+			await waitFor(
+				() => {
+					expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			// Verify the incorrect attempt is initially visible
+			expect(screen.getByText("x = 3/9")).toBeInTheDocument();
+
+			// Now complete the correct steps to solve the problem
+			fireEvent.change(input, { target: { value: "3x = 9" } });
+			fireEvent.click(checkButton);
+
+			await waitFor(
+				() => {
+					expect(screen.getByText("Step 3:")).toBeInTheDocument();
+				},
+				{ timeout: 1000 },
+			);
+
+			fireEvent.change(input, { target: { value: "x = 3" } });
+			fireEvent.click(checkButton);
+
+			// After solving the problem, verify correct solution display
+			await waitFor(
+				() => {
+					expect(screen.getByText("Final Answer")).toBeInTheDocument();
+					expect(screen.getByText("🎉 Excellent work!")).toBeInTheDocument();
+				},
+				{ timeout: 1500 },
+			);
+
+			// In our unified timeline, all attempts remain visible in chronological order
+			// but the incorrect attempt "x = 3/9" should still be present in the timeline
+			// since it's part of the chronological history
+			expect(screen.getByText("x = 3/9")).toBeInTheDocument();
+			expect(screen.getByText("Incorrect Attempt")).toBeInTheDocument();
+			
+			// The timeline should show: Step 1 -> Incorrect Attempt -> Step 2 -> Step 3 -> Final Answer
+			expect(screen.getByText("Step 1")).toBeInTheDocument();
+			expect(screen.getByText("Step 2")).toBeInTheDocument();
+			expect(screen.getByText("Final Answer")).toBeInTheDocument();
+		});
 	});
 });

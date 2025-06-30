@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-	type ProblemModel,
-	type ValidationContext,
-	validateStep,
-} from "../validation-engine";
+import { validateStep } from "../../../convex/validation_engine";
+import type { ProblemModel, ValidationContext } from "../../types";
 
 describe("Phase 3 Verification - UI to Validation Engine Integration", () => {
 	const testProblem: ProblemModel = {

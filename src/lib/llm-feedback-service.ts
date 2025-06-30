@@ -1,5 +1,5 @@
 import { env } from "../env";
-import type { ProblemModel, ValidationResult } from "./validation-engine";
+import type { ProblemModel, ValidationResult } from "../types";
 
 const MODEL_NAME = "anthropic/claude-sonnet-4";
 

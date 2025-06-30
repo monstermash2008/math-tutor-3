@@ -1,4 +1,4 @@
-import type { ProblemModel, ValidationResult } from "./validation_engine";
+import type { ProblemModel, ValidationResult } from "../src/types";
 
 const MODEL_NAME = "anthropic/claude-sonnet-4";
 

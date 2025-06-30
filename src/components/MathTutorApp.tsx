@@ -7,7 +7,7 @@ import type {
 	FeedbackEntry,
 	FeedbackHistory,
 } from "../lib/llm-feedback-service";
-import type { ProblemModel, ValidationResult } from "../lib/validation-engine";
+import type { ProblemModel, ValidationResult } from "../types";
 import { FeedbackDisplay } from "./FeedbackDisplay";
 import { ProblemView } from "./ProblemView";
 import { StepsHistory } from "./StepsHistory";
@@ -118,7 +118,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 				currentStepNumber,
 				optimisticAttempt,
 				feedback: optimisticAttempt.feedback,
-				isCorrect: optimisticAttempt.isCorrect
+				isCorrect: optimisticAttempt.isCorrect,
 			});
 
 			return {
@@ -134,7 +134,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 			// Update the most recent attempt with success feedback
 			const updatedAttempts = [...state.allAttempts];
 			const lastAttemptIndex = updatedAttempts.length - 1;
-			
+
 			if (lastAttemptIndex >= 0) {
 				const lastAttempt = updatedAttempts[lastAttemptIndex];
 				updatedAttempts[lastAttemptIndex] = {
@@ -163,7 +163,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 			// Update the most recent attempt with error feedback
 			const updatedAttempts = [...state.allAttempts];
 			const lastAttemptIndex = updatedAttempts.length - 1;
-			
+
 			if (lastAttemptIndex >= 0) {
 				updatedAttempts[lastAttemptIndex] = {
 					...updatedAttempts[lastAttemptIndex],
@@ -186,7 +186,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 			// Update the most recent attempt and mark as solved
 			const updatedAttempts = [...state.allAttempts];
 			const lastAttemptIndex = updatedAttempts.length - 1;
-			
+
 			if (lastAttemptIndex >= 0) {
 				const lastAttempt = updatedAttempts[lastAttemptIndex];
 				updatedAttempts[lastAttemptIndex] = {

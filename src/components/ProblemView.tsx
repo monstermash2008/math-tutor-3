@@ -1,4 +1,4 @@
-import type { ProblemModel } from "../lib/validation-engine";
+import type { ProblemModel } from "../types";
 
 interface ProblemViewProps {
 	problem: ProblemModel;

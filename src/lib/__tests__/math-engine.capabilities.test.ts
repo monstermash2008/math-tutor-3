@@ -1,6 +1,6 @@
 import { parse } from "mathjs";
 import { describe, expect, it } from "vitest";
-import { areEquivalent, isFullySimplified } from "../math-engine";
+import { areEquivalent, isFullySimplified } from "../../../convex/math_engine";
 import {
 	analyzeExpressionTree,
 	findLikeTerms,
@@ -8,7 +8,7 @@ import {
 	hasConstantOperations,
 	hasDistributiveOpportunities,
 	hasUnsimplifiedOperations,
-} from "../math-engine";
+} from "../../../convex/math_engine";
 
 describe("Math Engine - Capabilities", () => {
 	describe("Linear Algebra - Basic Operations", () => {

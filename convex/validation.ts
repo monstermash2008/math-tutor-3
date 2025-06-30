@@ -7,23 +7,14 @@ import {
   needsSimplification,
   getSimplificationSuggestions,
   analyzeStepOperation,
-  getExpectedNextSteps,
-  type ValidationContext,
-  type ProblemModel 
+  getExpectedNextSteps
 } from "./validation_engine";
+import type { ValidationContext, ProblemModel, ValidationResult } from "../src/types";
 import { 
   getLLMFeedback, 
   constructPrompt,
   type LLMFeedbackRequest 
 } from "./llm_service";
-
-export type ValidationResult =
-  | "CORRECT_FINAL_STEP"
-  | "CORRECT_INTERMEDIATE_STEP"
-  | "CORRECT_BUT_NOT_SIMPLIFIED"
-  | "VALID_BUT_NO_PROGRESS"
-  | "EQUIVALENCE_FAILURE"
-  | "PARSING_ERROR";
 
 export interface StepValidationResponse {
   result: ValidationResult;

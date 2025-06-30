@@ -1,6 +1,4 @@
 import {
-	MathParsingError,
-	type TreeAnalysisResult,
 	analyzeExpressionTree,
 	areEquivalent,
 	getCanonical,
@@ -9,59 +7,14 @@ import {
 	validateMathInputSyntax,
 } from "./math_engine";
 
-/**
- * Validation result codes that indicate the outcome of step validation
- */
-export type ValidationResult =
-	| "CORRECT_FINAL_STEP"
-	| "CORRECT_INTERMEDIATE_STEP"
-	| "CORRECT_BUT_NOT_SIMPLIFIED"
-	| "VALID_BUT_NO_PROGRESS"
-	| "EQUIVALENCE_FAILURE"
-	| "PARSING_ERROR";
-
-/**
- * The result of validating a student's step
- */
-export interface StepValidationResult {
-	result: ValidationResult;
-	isCorrect: boolean;
-	shouldAdvance: boolean;
-	errorMessage?: string;
-	treeAnalysis?: TreeAnalysisResult;
-	simplificationFeedback?: string[];
-	detectedPatterns?: string[];
-}
-
-/**
- * Problem model representing the database format
- */
-export interface ProblemModel {
-	_id: string;
-	problemStatement: string;
-	problemType: "SOLVE_EQUATION" | "SIMPLIFY_EXPRESSION";
-	solutionSteps: string[];
-	title?: string;
-	description?: string;
-	difficulty: "Easy" | "Medium" | "Hard";
-	subject?: string;
-	gradeLevel?: string;
-	isPublic: boolean;
-	tags?: string[];
-	timesAttempted: number;
-	averageSteps?: number;
-	successRate?: number;
-	createdBy?: string;
-}
-
-/**
- * Context needed for step validation
- */
-export interface ValidationContext {
-	problemModel: ProblemModel;
-	userHistory: string[];
-	studentInput: string;
-}
+import type {
+	ValidationResult,
+	StepValidationResult,
+	ProblemModel,
+	ValidationContext,
+	TreeAnalysisResult,
+} from "../src/types";
+import { MathParsingError } from "../src/types";
 
 /**
  * Main validation function that checks a student's step against the problem model

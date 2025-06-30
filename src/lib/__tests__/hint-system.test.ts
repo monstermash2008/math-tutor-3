@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { ProblemModel } from "../../types";
 import { constructPrompt } from "../llm-feedback-service";
 import type { LLMFeedbackRequest } from "../llm-feedback-service";
-import type { ProblemModel } from "../validation-engine";
 
 describe("Hint System", () => {
 	const mockProblem: ProblemModel = {

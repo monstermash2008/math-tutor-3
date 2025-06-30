@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import type { ProblemModel } from "../lib/validation-engine";
+import type { ProblemModel } from "../types";
 
 interface ProblemCardProps {
 	problem: ProblemModel;

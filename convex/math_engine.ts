@@ -6,18 +6,8 @@ import {
 	simplify,
 } from "mathjs";
 
-/**
- * Custom error class for mathematical parsing errors
- */
-export class MathParsingError extends Error {
-	constructor(
-		message: string,
-		public originalInput: string,
-	) {
-		super(message);
-		this.name = "MathParsingError";
-	}
-}
+import { MathParsingError } from "../src/types";
+import type { SimplificationPattern, TreeAnalysisResult } from "../src/types";
 
 /**
  * Validates input for obviously malformed expressions
@@ -279,54 +269,26 @@ export function areEquivalent(expr1: string, expr2: string): boolean {
 	}
 }
 
-export interface SimplificationPattern {
-	type:
-		| "CONSTANT_ARITHMETIC"
-		| "LIKE_TERMS"
-		| "DISTRIBUTIVE"
-		| "COEFFICIENT_NORMALIZATION";
-	description: string;
-	nodes: MathNode[];
-	suggestion: string;
-}
-
-export interface TreeAnalysisResult {
-	isFullySimplified: boolean;
-	patterns: SimplificationPattern[];
-	hasUnsimplifiedOperations: boolean;
-}
-
 export function hasConstantOperations(node: MathNode): SimplificationPattern[] {
 	const patterns: SimplificationPattern[] = [];
 
-	if (node.type === 'OperatorNode') {
-		const operatorNode = node as OperatorNode;
-		if (
-			operatorNode.fn === "add" ||
-			operatorNode.fn === "subtract" ||
-			operatorNode.fn === "multiply" ||
-			operatorNode.fn === "divide"
-		) {
-			const args = operatorNode.args;
-			if (
-				args.length === 2 &&
-				args.every((arg) => arg.type === 'ConstantNode' || arg.type === 'OperatorNode')
-			) {
-				patterns.push({
-					type: "CONSTANT_ARITHMETIC",
-					description: `Simplify ${node.toString()}`,
-					nodes: [node],
-					suggestion: `Calculate ${node.toString()} directly`,
-				});
-			}
-		}
-	}
+	// Filter for operator nodes where all arguments are constants
+	const constantOperations = node.filter((childNode) => {
+		if (childNode.type !== "OperatorNode") return false;
 
-	// Recursively check child nodes
-	if ("args" in node && Array.isArray(node.args)) {
-		for (const arg of node.args) {
-			patterns.push(...hasConstantOperations(arg));
-		}
+		const opNode = childNode as OperatorNode;
+		// Check if all arguments are constant nodes
+		return opNode.args.every((arg) => arg.type === "ConstantNode");
+	});
+
+	for (const opNode of constantOperations) {
+		const operatorNode = opNode as OperatorNode;
+		patterns.push({
+			type: "CONSTANT_ARITHMETIC",
+			description: `Constant arithmetic operation: ${operatorNode.toString()}`,
+			nodes: [operatorNode],
+			suggestion: `Simplify ${operatorNode.toString()} to ${simplify(operatorNode).toString()}`,
+		});
 	}
 
 	return patterns;
@@ -335,34 +297,33 @@ export function hasConstantOperations(node: MathNode): SimplificationPattern[] {
 export function findLikeTerms(node: MathNode): SimplificationPattern[] {
 	const patterns: SimplificationPattern[] = [];
 
-	if (node.type === 'OperatorNode') {
-		const operatorNode = node as OperatorNode;
-		if (operatorNode.fn === "add" || operatorNode.fn === "subtract") {
-			const terms = extractTermsFromExpression(node);
-			const termGroups: { [key: string]: MathNode[] } = {};
+	// Extract all terms from addition/subtraction operations
+	const terms = extractTermsFromExpression(node);
 
-			// Group terms by their variable part
-			for (const term of terms) {
-				const variablePart = getVariablePart(term);
-				if (!termGroups[variablePart]) {
-					termGroups[variablePart] = [];
-				}
-				termGroups[variablePart].push(term);
-			}
+	// Group terms by their variable part
+	const termGroups = new Map<string, MathNode[]>();
 
-			// Find groups with multiple terms (like terms)
-			for (const [variablePart, groupTerms] of Object.entries(termGroups)) {
-				if (groupTerms.length > 1) {
-					patterns.push({
-						type: "LIKE_TERMS",
-						description: `Combine like terms with ${variablePart || "constants"}`,
-						nodes: groupTerms,
-						suggestion: `Add the coefficients of ${
-							variablePart || "constant terms"
-						}`,
-					});
-				}
-			}
+	for (const term of terms) {
+		const variablePart = getVariablePart(term);
+		if (!termGroups.has(variablePart)) {
+			termGroups.set(variablePart, []);
+		}
+		const termGroup = termGroups.get(variablePart);
+		if (termGroup) {
+			termGroup.push(term);
+		}
+	}
+
+	// Find groups with more than one term (like terms)
+	for (const [variablePart, groupTerms] of termGroups) {
+		if (groupTerms.length > 1 && variablePart !== "1") {
+			// Don't group pure constants
+			patterns.push({
+				type: "LIKE_TERMS",
+				description: `Like terms with variable part: ${variablePart}`,
+				nodes: groupTerms,
+				suggestion: `Combine like terms: ${groupTerms.map((t) => t.toString()).join(" + ")}`,
+			});
 		}
 	}
 
@@ -374,78 +335,100 @@ export function hasDistributiveOpportunities(
 ): SimplificationPattern[] {
 	const patterns: SimplificationPattern[] = [];
 
-	if (node.type === 'OperatorNode') {
-		const operatorNode = node as OperatorNode;
+	// Filter for multiplication nodes where one operand is a parenthesized expression
+	const distributiveOps = node.filter((childNode) => {
+		if (childNode.type !== "OperatorNode") return false;
 
-		// Look for multiplication with parentheses: a(b + c)
-		if (operatorNode.fn === "multiply" && operatorNode.args.length === 2) {
-			const [left, right] = operatorNode.args;
+		const opNode = childNode as OperatorNode;
+		if (opNode.op !== "*") return false;
 
-			// Check if one operand is a sum/difference
-			if (
-				(left.type === 'OperatorNode' &&
-					((left as OperatorNode).fn === "add" ||
-						(left as OperatorNode).fn === "subtract")) ||
-				(right.type === 'OperatorNode' &&
-					((right as OperatorNode).fn === "add" ||
-						(right as OperatorNode).fn === "subtract"))
-			) {
-				patterns.push({
-					type: "DISTRIBUTIVE",
-					description: `Apply distributive property to ${node.toString()}`,
-					nodes: [node],
-					suggestion: "Distribute multiplication over addition/subtraction",
-				});
+		// Check if one argument is a parenthesized addition/subtraction
+		return opNode.args.some((arg) => {
+			// Handle ParenthesisNode containing addition/subtraction
+			if (arg.type === "ParenthesisNode") {
+				const parenthesisNode = arg as { content?: MathNode }; // ParenthesisNode structure
+				return (
+					parenthesisNode.content &&
+					parenthesisNode.content.type === "OperatorNode" &&
+					((parenthesisNode.content as OperatorNode).op === "+" ||
+						(parenthesisNode.content as OperatorNode).op === "-")
+				);
 			}
-		}
-	}
+			// Also handle direct OperatorNode (for cases without explicit parentheses)
+			return (
+				arg.type === "OperatorNode" &&
+				((arg as OperatorNode).op === "+" || (arg as OperatorNode).op === "-")
+			);
+		});
+	});
 
-	// Recursively check child nodes
-	if ("args" in node && Array.isArray(node.args)) {
-		for (const arg of node.args) {
-			patterns.push(...hasDistributiveOpportunities(arg));
-		}
+	for (const opNode of distributiveOps) {
+		const operatorNode = opNode as OperatorNode;
+		patterns.push({
+			type: "DISTRIBUTIVE",
+			description: `Distributive property opportunity: ${operatorNode.toString()}`,
+			nodes: [operatorNode],
+			suggestion: `Distribute: ${operatorNode.toString()}`,
+		});
 	}
 
 	return patterns;
 }
 
 export function hasUnsimplifiedOperations(node: MathNode): boolean {
-	// Check for constant arithmetic
-	if (node.type === 'OperatorNode') {
-		const operatorNode = node as OperatorNode;
-		if (
-			operatorNode.fn === "add" ||
-			operatorNode.fn === "subtract" ||
-			operatorNode.fn === "multiply" ||
-			operatorNode.fn === "divide"
-		) {
-			const args = operatorNode.args;
-			if (args.length === 2 && args.every((arg) => arg.type === 'ConstantNode')) {
-				return true;
+	let hasUnsimplified = false;
+
+	node.traverse((childNode) => {
+		// Check for constant arithmetic
+		if (childNode.type === "OperatorNode") {
+			const opNode = childNode as OperatorNode;
+			if (opNode.args.every((arg) => arg.type === "ConstantNode")) {
+				hasUnsimplified = true;
 			}
 		}
-	}
 
-	// Recursively check child nodes
-	if ("args" in node && Array.isArray(node.args)) {
-		for (const arg of node.args) {
-			if (hasUnsimplifiedOperations(arg)) {
-				return true;
+		// Check for coefficient normalization opportunities (1*x, -1*x, etc.)
+		if (childNode.type === "OperatorNode") {
+			const opNode = childNode as OperatorNode;
+			if (opNode.op === "*" && opNode.args.length === 2) {
+				const [first, second] = opNode.args;
+				if (first.type === "ConstantNode") {
+					const constantNode = first as ConstantNode;
+					if (constantNode.value === 1 || constantNode.value === -1) {
+						hasUnsimplified = true;
+					}
+				}
 			}
 		}
-	}
+	});
 
-	return false;
+	return hasUnsimplified;
 }
 
 export function analyzeExpressionTree(input: string): TreeAnalysisResult {
 	try {
+		// Check if input is an equation and handle it properly
+		const parsed = validateMathInputSyntax(input);
+		
+		if (parsed.isEquation && parsed.leftSide && parsed.rightSide) {
+			// Handle equations by analyzing both sides
+			const leftAnalysis = analyzeExpressionTree(parsed.leftSide);
+			const rightAnalysis = analyzeExpressionTree(parsed.rightSide);
+			
+			// Combine results from both sides
+			const combinedPatterns = [...leftAnalysis.patterns, ...rightAnalysis.patterns];
+			const combinedIsFullySimplified = leftAnalysis.isFullySimplified && rightAnalysis.isFullySimplified;
+			const combinedHasUnsimplifiedOps = leftAnalysis.hasUnsimplifiedOperations || rightAnalysis.hasUnsimplifiedOperations;
+			
+			return {
+				isFullySimplified: combinedIsFullySimplified && !combinedHasUnsimplifiedOps,
+				patterns: combinedPatterns,
+				hasUnsimplifiedOperations: combinedHasUnsimplifiedOps,
+			};
+		}
+		
+		// Handle regular expressions (non-equations) - use original logic
 		const node = parse(input);
-		const simplified = simplify(node);
-
-		// Check if expression is fully simplified
-		const isFullySimplified = node.equals(simplified);
 
 		// Find various simplification patterns
 		const constantPatterns = hasConstantOperations(node);
@@ -462,7 +445,7 @@ export function analyzeExpressionTree(input: string): TreeAnalysisResult {
 		const hasUnsimplifiedOps = hasUnsimplifiedOperations(node);
 
 		return {
-			isFullySimplified: isFullySimplified && !hasUnsimplifiedOps,
+			isFullySimplified: allPatterns.length === 0 && !hasUnsimplifiedOps,
 			patterns: allPatterns,
 			hasUnsimplifiedOperations: hasUnsimplifiedOps,
 		};
@@ -479,21 +462,19 @@ export function analyzeExpressionTree(input: string): TreeAnalysisResult {
 function extractTermsFromExpression(node: MathNode): MathNode[] {
 	const terms: MathNode[] = [];
 
-	if (node.type === 'OperatorNode') {
-		const operatorNode = node as OperatorNode;
-		if (operatorNode.fn === "add") {
-			// For addition, all arguments are terms
-			terms.push(...operatorNode.args);
-		} else if (operatorNode.fn === "subtract" && operatorNode.args.length === 2) {
-			// For subtraction, first arg is positive, second is negative
-			terms.push(operatorNode.args[0]);
-			// Create a negative version of the second term
-			terms.push(operatorNode.args[1]);
+	if (node.type === "OperatorNode") {
+		const opNode = node as OperatorNode;
+		if (opNode.op === "+" || opNode.op === "-") {
+			// For addition/subtraction, recursively extract terms
+			for (const arg of opNode.args) {
+				terms.push(...extractTermsFromExpression(arg));
+			}
 		} else {
-			// For other operations, treat the whole node as a single term
+			// For other operations, treat the whole thing as one term
 			terms.push(node);
 		}
 	} else {
+		// For constants, symbols, etc., treat as single term
 		terms.push(node);
 	}
 
@@ -501,27 +482,36 @@ function extractTermsFromExpression(node: MathNode): MathNode[] {
 }
 
 function getVariablePart(node: MathNode): string {
-	try {
-		// For constants, return empty string
-		if (node.type === 'ConstantNode') {
-			return "";
+	if (node.type === "ConstantNode") {
+		return "1"; // Pure constant
+	}
+
+	if (node.type === "SymbolNode") {
+		return node.toString(); // Pure variable
+	}
+
+	if (node.type === "OperatorNode") {
+		const opNode = node as OperatorNode;
+
+		if (opNode.op === "*") {
+			// For multiplication, extract non-constant factors
+			const nonConstantFactors = opNode.args.filter(
+				(arg) => arg.type !== "ConstantNode",
+			);
+			if (nonConstantFactors.length === 0) {
+				return "1"; // All factors are constants
+			}
+			return nonConstantFactors.map((f) => f.toString()).join("*");
 		}
 
-		// For variables, return the variable name
-		if (node.type === 'SymbolNode') {
+		if (opNode.op === "^") {
+			// For powers, the whole thing is the variable part
 			return node.toString();
 		}
-
-		// For more complex expressions, try to extract variable pattern
-		// This is a simplified approach - could be enhanced for more complex cases
-		const nodeStr = node.toString();
-
-		// Remove coefficients and extract variable pattern
-		const variableMatch = nodeStr.match(/[a-zA-Z]+(\^[0-9]+)?/);
-		return variableMatch ? variableMatch[0] : nodeStr;
-	} catch {
-		return node.toString();
 	}
+
+	// Default: use the whole expression
+	return node.toString();
 }
 
 export function getSimplificationFeedback(
@@ -532,16 +522,20 @@ export function getSimplificationFeedback(
 	for (const pattern of patterns) {
 		switch (pattern.type) {
 			case "CONSTANT_ARITHMETIC":
-				feedback.push("You can simplify the arithmetic operations");
+				feedback.push(`You can simplify the arithmetic: ${pattern.suggestion}`);
 				break;
 			case "LIKE_TERMS":
-				feedback.push("Look for like terms that can be combined");
+				feedback.push(`You can combine like terms: ${pattern.suggestion}`);
 				break;
 			case "DISTRIBUTIVE":
-				feedback.push("Consider using the distributive property");
+				feedback.push(
+					`You can use the distributive property: ${pattern.suggestion}`,
+				);
 				break;
 			case "COEFFICIENT_NORMALIZATION":
-				feedback.push("The coefficients could be simplified");
+				feedback.push(
+					`You can simplify the coefficient: ${pattern.suggestion}`,
+				);
 				break;
 		}
 	}

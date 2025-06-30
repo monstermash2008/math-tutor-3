@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ProblemModel, ValidationResult } from "../../types";
 import {
 	type LLMFeedbackRequest,
 	constructPrompt,
 } from "../llm-feedback-service";
-import type { ProblemModel, ValidationResult } from "../validation-engine";
 
 // Mock the environment
 vi.mock("../env", () => ({
