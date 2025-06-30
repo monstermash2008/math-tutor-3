@@ -5,6 +5,9 @@ import {
 	getSimplificationFeedback,
 	isFullySimplified,
 	validateMathInputSyntax,
+	// Phase 6b: Import new enhanced canonical functions
+	getEnhancedCanonical,
+	areCanonicallyEquivalent,
 } from "./math_engine";
 
 import type {
@@ -37,29 +40,24 @@ export function validateStep(context: ValidationContext): StepValidationResult {
 		);
 		const detectedPatterns = treeAnalysis.patterns.map((p) => p.type);
 
-		// Get the previous step (last correct step in history)
-		const previousStep = userHistory[userHistory.length - 1];
+		// Phase 6b: Enhanced step validation using canonical forms
+		// Check if student input is equivalent to any valid teacher step
+		let isCorrectStep = false;
 		const teacherSteps = problemModel.solutionSteps;
 
-		// Check if student input matches any teacher step
-		const matchingTeacherStep = teacherSteps.find((teacherStep) => {
-			try {
-				return areEquivalent(studentInput, teacherStep);
-			} catch {
-				return false;
+		for (const step of teacherSteps) {
+			// Try enhanced canonical comparison first (Phase 6b)
+			if (areCanonicallyEquivalent(studentInput, step)) {
+				isCorrectStep = true;
+				break;
 			}
-		});
+		}
 
-		const isCorrectStep = !!matchingTeacherStep;
+		// Additional check for progress validation with enhanced equivalence
+		const previousStep = userHistory[userHistory.length - 1] || problemModel.problemStatement;
+		const hasNoProgress = checkForNoProgress(studentInput, previousStep, isCorrectStep);
 
-		// Enhanced progress check using tree analysis
-		const isRepeatingPreviousStep = checkForNoProgress(
-			studentInput,
-			previousStep,
-			isCorrectStep,
-		);
-
-		if (isRepeatingPreviousStep) {
+		if (hasNoProgress) {
 			return {
 				result: "VALID_BUT_NO_PROGRESS",
 				isCorrect: false,
@@ -71,12 +69,19 @@ export function validateStep(context: ValidationContext): StepValidationResult {
 		}
 
 		if (isCorrectStep) {
-			// Find which specific teacher step this matches
+			// Find which specific teacher step this matches using enhanced comparison
 			let matchingStepIndex = teacherSteps.findIndex(
-				(step) => studentInput.trim() === step.trim(),
+				(step) => areCanonicallyEquivalent(studentInput, step),
 			);
 
-			// If no exact match found, look for equivalent match
+			// Fallback to exact string match if canonical comparison fails
+			if (matchingStepIndex === -1) {
+				matchingStepIndex = teacherSteps.findIndex(
+					(step) => studentInput.trim() === step.trim(),
+				);
+			}
+
+			// Fallback to original equivalence check if needed
 			if (matchingStepIndex === -1) {
 				matchingStepIndex = teacherSteps.findIndex((step) =>
 					areEquivalent(studentInput, step),
@@ -153,6 +158,7 @@ export function validateStep(context: ValidationContext): StepValidationResult {
 
 /**
  * Enhanced progress check that uses tree analysis to detect meaningful changes
+ * Phase 6b: Now uses enhanced canonical comparison for better accuracy
  */
 function checkForNoProgress(
 	studentInput: string,
@@ -169,9 +175,9 @@ function checkForNoProgress(
 		return false;
 	}
 
-	// Check mathematical equivalence
+	// Phase 6b: Check mathematical equivalence using enhanced canonical comparison
 	try {
-		if (areEquivalent(studentInput, previousStep)) {
+		if (areCanonicallyEquivalent(studentInput, previousStep)) {
 			// Even if mathematically equivalent, check if simplification patterns changed
 			const currentAnalysis = analyzeExpressionTree(studentInput);
 			const previousAnalysis = analyzeExpressionTree(previousStep);
@@ -183,8 +189,21 @@ function checkForNoProgress(
 			return currentPatternCount >= previousPatternCount;
 		}
 	} catch {
-		// If comparison fails, assume it's not repetition
-		return false;
+		// If canonical comparison fails, fall back to original method
+		try {
+			if (areEquivalent(studentInput, previousStep)) {
+				const currentAnalysis = analyzeExpressionTree(studentInput);
+				const previousAnalysis = analyzeExpressionTree(previousStep);
+
+				const currentPatternCount = currentAnalysis.patterns.length;
+				const previousPatternCount = previousAnalysis.patterns.length;
+
+				return currentPatternCount >= previousPatternCount;
+			}
+		} catch {
+			// If comparison fails, assume it's not repetition
+			return false;
+		}
 	}
 
 	return false;
@@ -192,6 +211,7 @@ function checkForNoProgress(
 
 /**
  * Checks if the problem has been completely solved using tree-based analysis
+ * Phase 6b: Enhanced with canonical comparison for better accuracy
  *
  * @param context - The validation context
  * @returns true if the last step in history is equivalent to the final teacher step and simplified
@@ -207,9 +227,18 @@ export function isProblemSolved(context: ValidationContext): boolean {
 	const finalTeacherStep = problemModel.solutionSteps[problemModel.solutionSteps.length - 1];
 
 	try {
-		return areEquivalent(lastStep, finalTeacherStep) && isFullySimplified(lastStep);
+		// Phase 6b: Use enhanced canonical comparison first
+		const isEquivalent = areCanonicallyEquivalent(lastStep, finalTeacherStep);
+		
+		if (!isEquivalent) {
+			// Fallback to original equivalence check
+			return areEquivalent(lastStep, finalTeacherStep) && isFullySimplified(lastStep);
+		}
+		
+		return isEquivalent && isFullySimplified(lastStep);
 	} catch {
-		return false;
+		// Fallback to original method if canonical comparison fails
+		return areEquivalent(lastStep, finalTeacherStep) && isFullySimplified(lastStep);
 	}
 }
 

@@ -79,6 +79,39 @@ export function validateMathInputSyntax(input: string): {
 	};
 }
 
+/**
+ * Normalizes equation canonical forms to ensure equivalent equations produce identical results
+ * For example: both "3x = 9" and "9 = 3x" should produce the same canonical form
+ */
+function normalizeEquationCanonicalForm(node: MathNode): MathNode {
+	try {
+		// For expressions of the form A - B = 0 (canonical equation form)
+		// We want to ensure consistent ordering: variables before constants
+		
+		const nodeStr = node.toString();
+		
+		// If the expression is a simple form like "9 - 3 * x", convert to "3 * x - 9"
+		// Pattern: constant - variable*term -> variable*term - constant
+		if (nodeStr.match(/^\d+\s*-\s*\d*\s*\*?\s*[a-zA-Z]/)) {
+			// This is in the form "constant - variable", flip it to "variable - constant"
+			const simplified = simplify(parse(`-(${nodeStr})`));
+			return simplified;
+		}
+		
+		// If the expression starts with a negative variable term, try to normalize
+		if (nodeStr.match(/^-\d*[a-zA-Z]/) || nodeStr.startsWith("-(")) {
+			// Multiply the entire expression by -1 to get positive leading coefficient
+			const flipped = simplify(parse(`-(${nodeStr})`));
+			return flipped;
+		}
+		
+		return node;
+	} catch {
+		// If normalization fails, return the original node
+		return node;
+	}
+}
+
 export function getCanonical(input: string): MathNode {
 	try {
 		const parsed = validateMathInputSyntax(input);
@@ -86,8 +119,13 @@ export function getCanonical(input: string): MathNode {
 		if (parsed.isEquation) {
 			// Transform A = B into A - B and simplify
 			const differenceExpression = `(${parsed.leftSide}) - (${parsed.rightSide})`;
-			const node = parse(differenceExpression);
-			return simplify(node);
+			let node = parse(differenceExpression);
+			node = simplify(node);
+			
+			// Normalize equation canonical form: ensure consistent sign
+			node = normalizeEquationCanonicalForm(node);
+			
+			return node;
 		}
 
 		// Handle regular expressions
@@ -199,73 +237,537 @@ export function areEquivalent(expr1: string, expr2: string): boolean {
 		validateMathInput(expr1);
 		validateMathInput(expr2);
 
-		// For equations, convert to canonical form first
-		if (expr1.includes("=") || expr2.includes("=")) {
-			const canonical1 = getCanonical(expr1);
-			const canonical2 = getCanonical(expr2);
+		// Phase 6b: Use enhanced canonical comparison for all cases
+		const canonical1 = getEnhancedCanonical(expr1);
+		const canonical2 = getEnhancedCanonical(expr2);
 
-			// Try direct comparison first
-			if (canonical1.equals(canonical2)) {
+		// Tree-based comparison is the most reliable method
+		if (canonical1.equals(canonical2)) {
+			return true;
+		}
+
+		// Phase 6b: Use algebraic difference method for cases where canonical forms differ
+		// If (expr1) - (expr2) simplifies to 0, then they're equivalent
+		try {
+			const difference = simplify(parse(`(${expr1}) - (${expr2})`));
+			
+			// Check if difference is zero
+			if (difference.toString() === "0" || difference.equals(parse("0"))) {
 				return true;
 			}
-
-			// If direct comparison fails, use numerical testing
+			
+			// Check if difference is a zero constant node
+			if (difference.type === "ConstantNode" && (difference as ConstantNode).value === 0) {
+				return true;
+			}
+			
+			return false;
+		} catch {
+			// If difference calculation fails, try string-based fallback
 			try {
-				const difference = simplify(
-					`(${canonical1.toString()}) - (${canonical2.toString()})`,
-				);
-
-				// Check if difference is literally zero
-				if (difference.toString() === "0" || difference.equals(parse("0"))) {
+				const str1 = canonical1.toString();
+				const str2 = canonical2.toString();
+				
+				// Normalize whitespace and implicit multiplication
+				const normalize = (s: string) => s.replace(/\s/g, "").replace(/\*/g, "");
+				
+				if (normalize(str1) === normalize(str2)) {
 					return true;
 				}
-
-				// Test at multiple points
-				const testValues = [0, 1, 2, -1, 5, 10];
-				return testValues.every((x) => {
-					try {
-						const result = difference.evaluate({ x });
-						return Math.abs(result) < 1e-10;
-					} catch {
-						return false;
-					}
-				});
+				
+				// Apply term ordering normalization as final attempt
+				const normalized1 = normalizeTermOrder(str1);
+				const normalized2 = normalizeTermOrder(str2);
+				
+				return normalize(normalized1) === normalize(normalized2);
 			} catch {
 				return false;
 			}
 		}
-
-		// Handle regular expressions by comparing their difference
-		const node1 = parse(expr1);
-		const node2 = parse(expr2);
-
-		// Try direct comparison first (most efficient)
-		if (node1.equals(node2)) {
-			return true;
-		}
-
-		// Calculate difference and simplify
-		const difference = simplify(`(${expr1}) - (${expr2})`);
-
-		// Check if difference is literally zero
-		if (difference.toString() === "0" || difference.equals(parse("0"))) {
-			return true;
-		}
-
-		// For more complex expressions, test at multiple points
-		const testValues = [0, 1, 2, -1, 5, 10];
-		return testValues.every((x) => {
-			try {
-				const result = difference.evaluate({ x });
-				return Math.abs(result) < 1e-10;
-			} catch {
-				// If evaluation fails (e.g., division by zero), try different approach
-				return false;
-			}
-		});
 	} catch {
 		// If any step fails, expressions are not equivalent
 		return false;
+	}
+}
+
+/**
+ * Phase 6b: Enhanced canonical form generation using tree transformation methods
+ * Ensures mathematically equivalent expressions produce identical tree structures
+ */
+export function getEnhancedCanonical(input: string): MathNode {
+	try {
+		const parsed = validateMathInputSyntax(input);
+
+		if (parsed.isEquation) {
+			// Transform A = B into A - B and apply canonical transformation
+			const differenceExpression = `(${parsed.leftSide}) - (${parsed.rightSide})`;
+			let node = parse(differenceExpression);
+			
+			// Apply enhanced canonical transformation
+			node = applyCanonicalTransformation(node);
+			
+			// Normalize equation canonical form: ensure consistent sign
+			node = normalizeEquationCanonicalForm(node);
+			
+			return node;
+		}
+
+		// Handle regular expressions with enhanced canonical transformation
+		const node = parse(parsed.trimmedInput);
+		return applyCanonicalTransformation(node);
+	} catch (error) {
+		if (error instanceof MathParsingError) {
+			throw error;
+		}
+
+		throw new MathParsingError(
+			`Failed to parse mathematical expression: ${error instanceof Error ? error.message : "Unknown error"}`,
+			input,
+		);
+	}
+}
+
+/**
+ * Phase 6b: Ensure full expansion using aggressive simplification
+ * Trust math.js's built-in expansion capabilities
+ */
+function expandDistributive(node: MathNode): MathNode {
+	try {
+		// Convert to string and reparse to trigger fresh simplification
+		const nodeStr = node.toString();
+		const reparsed = parse(nodeStr);
+		
+		// Apply aggressive simplification which includes distributive expansion
+		const simplified = simplify(reparsed);
+		
+		return simplified;
+	} catch {
+		// If expansion fails, return the original node
+		return node;
+	}
+}
+
+/**
+ * Phase 6b: Force full expansion of expressions by applying expand() function
+ * This ensures distributive properties are fully expanded for canonical comparison
+ */
+function forceFullExpansion(node: MathNode): MathNode {
+	try {
+		// Use math.js's expand() function which forces full expansion
+		const nodeStr = node.toString();
+		
+		// First try the expand function
+		const expanded = parse(nodeStr);
+		
+		// Apply expansion using string-based approach for better control
+		let expandedStr = nodeStr;
+		
+		// Force expansion of patterns like a*(b + c) -> a*b + a*c
+		// Use a more aggressive approach to ensure all distributions are expanded
+		try {
+			const expandResult = simplify(expanded, ['expand']);
+			return expandResult;
+		} catch {
+			// If expand rule fails, use manual approach
+			return manualExpansion(expanded);
+		}
+	} catch {
+		return node;
+	}
+}
+
+/**
+ * Phase 6b: Manual expansion for cases where math.js expand doesn't work
+ */
+function manualExpansion(node: MathNode): MathNode {
+	try {
+		// Convert to string and apply manual expansion patterns
+		let exprStr = node.toString();
+		
+		// Expand patterns like 2*(x + 3) -> 2*x + 6
+		// This is a simple regex-based expansion for common patterns
+		exprStr = exprStr.replace(/(\d+)\s*\*\s*\(([^)]+)\)/g, (match, coeff, inner) => {
+					// Split the inner expression by + and - while preserving signs
+		const terms = inner.split(/(\+|\-)/).filter((t: string) => t.trim());
+			let result = '';
+			
+			for (let i = 0; i < terms.length; i++) {
+				const term = terms[i].trim();
+				if (term === '+' || term === '-') {
+					result += ` ${term} `;
+				} else if (term) {
+					if (result && !result.endsWith(' + ') && !result.endsWith(' - ')) {
+						result += ' + ';
+					}
+					result += `${coeff} * ${term}`;
+				}
+			}
+			
+			return result;
+		});
+		
+		return parse(exprStr);
+	} catch {
+		return node;
+	}
+}
+
+/**
+ * Phase 6b: Normalize expression ordering for consistent canonical forms
+ * Handles term ordering that math.js doesn't guarantee
+ */
+function normalizeExpressionOrder(node: MathNode): MathNode {
+	try {
+		// Convert to normalized string representation and reparse
+		const normalizedStr = normalizeTermOrder(node.toString());
+		return parse(normalizedStr);
+	} catch {
+		return node;
+	}
+}
+
+/**
+ * Phase 6b: Normalize term ordering in expression strings using tree-based parsing
+ * Implements consistent ordering rules: alphabetical variables, descending powers, constants last
+ */
+function normalizeTermOrder(expr: string): string {
+	try {
+		// Parse and simplify the expression first
+		const parsed = parse(expr);
+		const simplified = simplify(parsed);
+		
+		// Extract and sort terms properly
+		const sortedExpr = sortExpressionTerms(simplified);
+		return sortedExpr.toString();
+	} catch {
+		return expr;
+	}
+}
+
+/**
+ * Phase 6b: Sort expression terms using tree analysis
+ * Provides consistent term ordering for canonical forms
+ */
+function sortExpressionTerms(node: MathNode): MathNode {
+	try {
+		// If it's not an addition/subtraction expression, return as-is
+		if (node.type !== "OperatorNode") {
+			return node;
+		}
+		
+		const opNode = node as OperatorNode;
+		if (opNode.op !== "+" && opNode.op !== "-") {
+			return node;
+		}
+		
+		// Extract all terms from the expression
+		const terms = extractAllTerms(node);
+		
+		// Sort terms according to canonical rules
+		const sortedTerms = terms.sort((a, b) => {
+			return compareTerms(a, b);
+		});
+		
+		// Reconstruct the expression
+		return reconstructSortedExpression(sortedTerms);
+	} catch {
+		return node;
+	}
+}
+
+/**
+ * Phase 6b: Extract all terms from an expression with their signs
+ */
+function extractAllTerms(node: MathNode): Array<{ term: MathNode; isPositive: boolean }> {
+	const terms: Array<{ term: MathNode; isPositive: boolean }> = [];
+	
+	function extract(currentNode: MathNode, sign: boolean) {
+		if (currentNode.type === "OperatorNode") {
+			const opNode = currentNode as OperatorNode;
+			
+			if (opNode.op === "+") {
+				// For addition, process all arguments with current sign
+				for (const arg of opNode.args) {
+					extract(arg, sign);
+				}
+			} else if (opNode.op === "-") {
+				if (opNode.args.length === 1) {
+					// Unary minus
+					extract(opNode.args[0], !sign);
+				} else if (opNode.args.length === 2) {
+					// Binary subtraction
+					extract(opNode.args[0], sign);
+					extract(opNode.args[1], !sign);
+				}
+			} else {
+				// Other operators are treated as single terms
+				terms.push({ term: currentNode, isPositive: sign });
+			}
+		} else {
+			// Constants, symbols, etc. are single terms
+			terms.push({ term: currentNode, isPositive: sign });
+		}
+	}
+	
+	extract(node, true);
+	return terms;
+}
+
+/**
+ * Phase 6b: Compare two terms for canonical ordering
+ * Rules: constants last, then alphabetical by main variable, then descending by power
+ */
+function compareTerms(a: { term: MathNode; isPositive: boolean }, b: { term: MathNode; isPositive: boolean }): number {
+	const termA = getTermInfo(a.term);
+	const termB = getTermInfo(b.term);
+	
+	// Constants come last
+	if (termA.isConstant !== termB.isConstant) {
+		return termA.isConstant ? 1 : -1;
+	}
+	
+	// If both are constants, order by value
+	if (termA.isConstant && termB.isConstant) {
+		return termA.value - termB.value;
+	}
+	
+	// Order alphabetically by main variable
+	if (termA.mainVariable !== termB.mainVariable) {
+		return termA.mainVariable.localeCompare(termB.mainVariable);
+	}
+	
+	// Same variable, order by descending power
+	return termB.power - termA.power;
+}
+
+/**
+ * Phase 6b: Extract term information for sorting
+ */
+function getTermInfo(term: MathNode): { isConstant: boolean; mainVariable: string; power: number; value: number } {
+	if (term.type === "ConstantNode") {
+		const constNode = term as ConstantNode;
+		return { 
+			isConstant: true, 
+			mainVariable: "", 
+			power: 0, 
+			value: typeof constNode.value === "number" ? constNode.value : 0 
+		};
+	}
+	
+	if (term.type === "SymbolNode") {
+		return { 
+			isConstant: false, 
+			mainVariable: term.toString(), 
+			power: 1, 
+			value: 0 
+		};
+	}
+	
+	if (term.type === "OperatorNode") {
+		const opNode = term as OperatorNode;
+		
+		// Handle powers like x^2
+		if (opNode.op === "^" && opNode.args.length === 2) {
+			const base = opNode.args[0];
+			const exponent = opNode.args[1];
+			
+			if (base.type === "SymbolNode" && exponent.type === "ConstantNode") {
+				const power = typeof (exponent as ConstantNode).value === "number" ? (exponent as ConstantNode).value as number : 1;
+				return { 
+					isConstant: false, 
+					mainVariable: base.toString(), 
+					power, 
+					value: 0 
+				};
+			}
+		}
+		
+		// Handle multiplication to find main variable
+		if (opNode.op === "*") {
+			let mainVar = "";
+			let mainPower = 1;
+			
+			// Look for the first variable in the multiplication
+			for (const arg of opNode.args) {
+				if (arg.type === "SymbolNode") {
+					mainVar = arg.toString();
+					break;
+				} else if (arg.type === "OperatorNode" && (arg as OperatorNode).op === "^") {
+					const powNode = arg as OperatorNode;
+					if (powNode.args[0].type === "SymbolNode" && powNode.args[1].type === "ConstantNode") {
+						mainVar = powNode.args[0].toString();
+						mainPower = typeof (powNode.args[1] as ConstantNode).value === "number" ? (powNode.args[1] as ConstantNode).value as number : 1;
+						break;
+					}
+				}
+			}
+			
+			if (mainVar) {
+				return { 
+					isConstant: false, 
+					mainVariable: mainVar, 
+					power: mainPower, 
+					value: 0 
+				};
+			}
+		}
+	}
+	
+	// Default case: treat as variable with alphabetical ordering
+	return { 
+		isConstant: false, 
+		mainVariable: term.toString(), 
+		power: 1, 
+		value: 0 
+	};
+}
+
+/**
+ * Phase 6b: Reconstruct expression from sorted terms
+ */
+function reconstructSortedExpression(terms: Array<{ term: MathNode; isPositive: boolean }>): MathNode {
+	if (terms.length === 0) {
+		return parse("0");
+	}
+	
+	if (terms.length === 1) {
+		const term = terms[0];
+		return term.isPositive ? term.term : parse(`-(${term.term.toString()})`);
+	}
+	
+	// Build expression string
+	let exprStr = "";
+	
+	for (let i = 0; i < terms.length; i++) {
+		const term = terms[i];
+		
+		if (i === 0) {
+			// First term
+			exprStr = term.isPositive ? term.term.toString() : `-(${term.term.toString()})`;
+		} else {
+			// Subsequent terms
+			if (term.isPositive) {
+				exprStr += ` + ${term.term.toString()}`;
+			} else {
+				exprStr += ` - ${term.term.toString()}`;
+			}
+		}
+	}
+	
+	return parse(exprStr);
+}
+
+/**
+ * Phase 6b: Core tree transformation function that applies all canonical rules
+ * Combines math.js simplification with forced expansion and consistent ordering
+ */
+export function applyCanonicalTransformation(node: MathNode): MathNode {
+	// Apply transformations in sequence for consistent results
+	let transformed = node;
+	
+	// Step 1: Force full expansion using string manipulation
+	transformed = forceFullExpansion(transformed);
+	
+	// Step 2: Apply simplification to clean up
+	transformed = simplify(transformed);
+	
+	// Step 3: Apply multiple rounds to ensure complete expansion
+	let previousForm = '';
+	for (let i = 0; i < 3; i++) {
+		const currentForm = transformed.toString();
+		if (currentForm === previousForm) {
+			break; // No changes, we're done
+		}
+		previousForm = currentForm;
+		transformed = forceFullExpansion(transformed);
+		transformed = simplify(transformed);
+	}
+	
+	// Step 4: Normalize coefficients for consistent representation
+	transformed = normalizeCoefficients(transformed);
+	
+	// Step 5: Apply consistent string-based normalization for ordering
+	transformed = normalizeExpressionOrder(transformed);
+	
+	// Step 6: Final simplification to clean up normalization artifacts
+	transformed = simplify(transformed);
+	
+	return transformed;
+}
+
+/**
+ * Phase 6b: Coefficient normalization using tree transformation
+ * Handles implicit coefficients, negative coefficients, and zero coefficients
+ */
+export function normalizeCoefficients(node: MathNode): MathNode {
+	// First simplify to normalize coefficient representations
+	let normalized = simplify(node);
+	
+	return normalized.transform((childNode) => {
+		// Handle multiplication nodes for coefficient normalization
+		if (childNode.type === "OperatorNode") {
+			const opNode = childNode as OperatorNode;
+			
+			if (opNode.op === "*" && opNode.args.length === 2) {
+				const [first, second] = opNode.args;
+				
+				// Check if first argument is a constant coefficient
+				if (first.type === "ConstantNode") {
+					const constantNode = first as ConstantNode;
+					const coefficient = constantNode.value;
+					
+					// Handle special coefficient cases
+					if (coefficient === 0) {
+						// 0 * x -> 0
+						return parse("0");
+					} else if (coefficient === 1) {
+						// 1 * x -> x
+						return second;
+					} else if (coefficient === -1) {
+						// -1 * x -> -x (create unary minus)
+						return parse(`-(${second.toString()})`);
+					}
+				}
+				
+				// Check if second argument is a constant coefficient (x * 2 -> 2 * x)
+				if (second.type === "ConstantNode") {
+					const constantNode = second as ConstantNode;
+					const coefficient = constantNode.value;
+					
+					if (coefficient === 0) {
+						return parse("0");
+					} else if (coefficient === 1) {
+						return first;
+					} else if (coefficient === -1) {
+						return parse(`-(${first.toString()})`);
+					}
+					
+					// Reorder to put coefficient first: x * 2 -> 2 * x
+					return parse(`${coefficient} * (${first.toString()})`);
+				}
+			}
+		}
+		
+		return childNode;
+	});
+}
+
+
+
+/**
+ * Phase 6b: Fast tree comparison using canonical forms
+ * More reliable than string comparison for mathematical equivalence
+ */
+export function areCanonicallyEquivalent(expr1: string, expr2: string): boolean {
+	try {
+		const canonical1 = getEnhancedCanonical(expr1);
+		const canonical2 = getEnhancedCanonical(expr2);
+		
+		// Direct tree comparison is the most reliable method
+		return canonical1.equals(canonical2);
+	} catch {
+		// If canonical transformation fails, fall back to original method
+		return areEquivalent(expr1, expr2);
 	}
 }
 
