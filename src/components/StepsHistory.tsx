@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FeedbackHistory } from "../lib/llm-feedback-service";
+import { LaTeXRenderer } from "./LaTeXRenderer";
 import type { StudentAttempt } from "./MathTutorApp";
 
 interface StepsHistoryProps {
@@ -19,6 +20,29 @@ interface TimelineItem {
 	status?: "pending" | "correct" | "incorrect";
 	feedback?: string;
 	isFinalAnswer?: boolean;
+}
+
+// Helper function to detect and render mathematical content
+function MathContent({ content, className = "" }: { content: string; className?: string }) {
+	// Simple heuristic to detect if content might be LaTeX
+	const isLaTeX = content.includes("\\") || content.includes("{") || content.includes("}");
+	
+	if (isLaTeX) {
+		return (
+			<LaTeXRenderer
+				latex={content}
+				displayMode={false}
+				className={className}
+			/>
+		);
+	}
+	
+	// Fallback to plain text for non-LaTeX content
+	return (
+		<span className={className}>
+			{content}
+		</span>
+	);
 }
 
 export function StepsHistory({
@@ -234,11 +258,10 @@ export function StepsHistory({
 										<p className={`text-sm font-semibold ${stepLabelColor}`}>
 											{stepLabel}
 										</p>
-										<p
-											className={`font-medium font-mono ${item.isFinalAnswer ? "text-blue-800 text-lg" : "text-gray-800"}`}
-										>
-											{item.content}
-										</p>
+										<MathContent 
+											content={item.content}
+											className={`font-medium ${item.isFinalAnswer ? "text-blue-800 text-lg" : "text-gray-800"}`}
+										/>
 										{item.isFinalAnswer && (
 											<p className="text-xs text-blue-600 mt-1 font-medium">
 												🎉 Excellent work!
@@ -342,9 +365,10 @@ export function StepsHistory({
 									<p className={`text-sm font-medium ${textColor}`}>
 										{label}
 									</p>
-									<p className="font-mono text-gray-800 mb-1">
-										{item.content}
-									</p>
+									<MathContent 
+										content={item.content}
+										className="text-gray-800 mb-1"
+									/>
 
 									{/* Show loading state for validating attempts */}
 									{isValidating && (

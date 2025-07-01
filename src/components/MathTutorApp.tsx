@@ -1,4 +1,3 @@
-import { useMutation } from "@tanstack/react-query";
 import { useAction } from "convex/react";
 import { useReducer } from "react";
 import { api } from "../../convex/_generated/api";
@@ -114,12 +113,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
 				stepNumber: currentStepNumber,
 			};
 
-			console.log("🔄 Optimistic update created:", {
-				currentStepNumber,
-				optimisticAttempt,
-				feedback: optimisticAttempt.feedback,
-				isCorrect: optimisticAttempt.isCorrect,
-			});
+			// console.log("🔄 Optimistic update created:", {
+			// 	currentStepNumber,
+			// 	optimisticAttempt,
+			// 	feedback: optimisticAttempt.feedback,
+			// 	isCorrect: optimisticAttempt.isCorrect,
+			// });
 
 			return {
 				...state,
@@ -343,9 +342,15 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 	const validateStepAction = useAction(api.validation.validateStep);
 
 	// Handle step validation using backend
-	const handleCheckStep = async (studentInput: string) => {
+	const handleCheckStep = async (studentInput: string, latexInput?: string) => {
+		// Use LaTeX input if available for validation, otherwise fall back to text
+		const inputForValidation = latexInput || studentInput;
+
 		// Optimistically add the step immediately
-		dispatch({ type: "CHECK_STEP_START", payload: { step: studentInput } });
+		dispatch({
+			type: "CHECK_STEP_START",
+			payload: { step: inputForValidation },
+		});
 		dispatch({ type: "RESET_FEEDBACK" });
 
 		try {
@@ -353,7 +358,7 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 			// Natural network latency replaces setTimeout
 			const validationResponse = await validateStepAction({
 				problemId: problem._id as Id<"problems">, // Cast to Convex ID type
-				studentInput,
+				studentInput: inputForValidation, // Use the input selected for validation
 				userHistory: state.userHistory,
 				sessionId: `session_${Date.now()}`, // Optional session tracking
 			});
@@ -432,13 +437,13 @@ export function MathTutorApp({ problem }: MathTutorAppProps) {
 					feedbackStatus: "success",
 					stepIndex: Math.max(0, currentStepIndex),
 					validationResult: result,
-					studentInput,
+					studentInput: inputForValidation, // Use the input that was validated
 					isCorrect,
 				},
 			});
 
 			// Optional: Log performance metrics
-			console.log(`Backend validation completed in ${processingTimeMs}ms`);
+			// console.log(`Backend validation completed in ${processingTimeMs}ms`);
 		} catch (error) {
 			dispatch({
 				type: "CHECK_STEP_ERROR",

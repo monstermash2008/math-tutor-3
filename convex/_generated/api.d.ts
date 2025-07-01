@@ -13,8 +13,10 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as cortex_math_engine from "../cortex_math_engine.js";
 import type * as llm_service from "../llm_service.js";
 import type * as math_engine from "../math_engine.js";
+import type * as math_engine_bridge from "../math_engine_bridge.js";
 import type * as migrations from "../migrations.js";
 import type * as problems from "../problems.js";
 import type * as validation from "../validation.js";
@@ -29,8 +31,10 @@ import type * as validation_engine from "../validation_engine.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  cortex_math_engine: typeof cortex_math_engine;
   llm_service: typeof llm_service;
   math_engine: typeof math_engine;
+  math_engine_bridge: typeof math_engine_bridge;
   migrations: typeof migrations;
   problems: typeof problems;
   validation: typeof validation;

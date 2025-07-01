@@ -120,13 +120,13 @@ export const validateStep = action({
 
              // Log attempt for analytics (simplified for demo)
        // In production, you'd call the internal mutation properly
-       console.log("Step attempt logged:", {
-         problemId: args.problemId,
-         studentInput: args.studentInput,
-         validationResult: validationResult.result,
-         isCorrect: validationResult.isCorrect,
-         processingTimeMs: processingTime,
-       });
+      //  console.log("Step attempt logged:", {
+      //    problemId: args.problemId,
+      //    studentInput: args.studentInput,
+      //    validationResult: validationResult.result,
+      //    isCorrect: validationResult.isCorrect,
+      //    processingTimeMs: processingTime,
+      //  });
 
       return {
         result: validationResult.result,

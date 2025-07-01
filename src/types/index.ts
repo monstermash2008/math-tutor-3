@@ -3,6 +3,7 @@
  * Used by both frontend components and Convex backend functions
  */
 
+import type { BoxedExpression } from "@cortex-js/compute-engine";
 import type { MathNode } from "mathjs";
 
 /**
@@ -26,7 +27,7 @@ export interface SimplificationPattern {
 		| "DISTRIBUTIVE"
 		| "COEFFICIENT_NORMALIZATION";
 	description: string;
-	nodes: MathNode[];
+	nodes: (MathNode | BoxedExpression)[];
 	suggestion: string;
 }
 

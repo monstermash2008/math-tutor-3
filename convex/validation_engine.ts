@@ -1,14 +1,14 @@
-import {
-	analyzeExpressionTree,
-	areEquivalent,
-	getCanonical,
-	getSimplificationFeedback,
-	isFullySimplified,
-	validateMathInputSyntax,
-	// Phase 6b: Import new enhanced canonical functions
-	getEnhancedCanonical,
-	areCanonicallyEquivalent,
-} from "./math_engine";
+// import {
+// 	analyzeExpressionTree,
+// 	areEquivalent,
+// 	getCanonical,
+// 	getSimplificationFeedback,
+// 	isFullySimplified,
+// 	validateMathInputSyntax,
+// 	// Phase 6b: Import new enhanced canonical functions
+// 	getEnhancedCanonical,
+// 	areCanonicallyEquivalent,
+// } from "./math_engine";
 
 import type {
 	ValidationResult,
@@ -18,6 +18,7 @@ import type {
 	TreeAnalysisResult,
 } from "../src/types";
 import { MathParsingError } from "../src/types";
+import { analyzeExpressionTree, areCanonicallyEquivalent, areEquivalent, getSimplificationFeedback, isFullySimplified, validateMathInputSyntax } from "./math_engine_bridge";
 
 /**
  * Main validation function that checks a student's step against the problem model

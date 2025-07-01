@@ -359,11 +359,11 @@ describe("MathTutorApp - Phase 3 Integration Tests", () => {
 			const validatingText = screen.queryByText("Validating Step...");
 			const validatingFeedback = screen.queryByText("Validating...");
 
-			console.log("Immediate state check:", {
-				hasValidatingText: !!validatingText,
-				hasValidatingFeedback: !!validatingFeedback,
-				hasIncorrectAttempt: !!screen.queryByText("Incorrect Attempt"),
-			});
+			// console.log("Immediate state check:", {
+			// 	hasValidatingText: !!validatingText,
+			// 	hasValidatingFeedback: !!validatingFeedback,
+			// 	hasIncorrectAttempt: !!screen.queryByText("Incorrect Attempt"),
+			// });
 
 			// Wait for final state
 			await waitFor(
