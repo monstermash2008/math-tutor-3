@@ -1,6 +1,6 @@
 import type { ProblemModel, ValidationResult } from "../src/types";
 
-const MODEL_NAME = "anthropic/claude-sonnet-4";
+const MODEL_NAME = "google/gemini-2.5-pro";
 
 // Data structure for tracking feedback history
 export interface FeedbackEntry {
