@@ -1,5 +1,5 @@
+import type { FeedbackHistory } from "convex/llm_service";
 import { useEffect, useState } from "react";
-import type { FeedbackHistory } from "../lib/llm-feedback-service";
 import { LaTeXRenderer } from "./LaTeXRenderer";
 import type { StudentAttempt } from "./MathTutorApp";
 
@@ -23,10 +23,14 @@ interface TimelineItem {
 }
 
 // Helper function to detect and render mathematical content
-function MathContent({ content, className = "" }: { content: string; className?: string }) {
+function MathContent({
+	content,
+	className = "",
+}: { content: string; className?: string }) {
 	// Simple heuristic to detect if content might be LaTeX
-	const isLaTeX = content.includes("\\") || content.includes("{") || content.includes("}");
-	
+	const isLaTeX =
+		content.includes("\\") || content.includes("{") || content.includes("}");
+
 	if (isLaTeX) {
 		return (
 			<LaTeXRenderer
@@ -36,13 +40,9 @@ function MathContent({ content, className = "" }: { content: string; className?:
 			/>
 		);
 	}
-	
+
 	// Fallback to plain text for non-LaTeX content
-	return (
-		<span className={className}>
-			{content}
-		</span>
-	);
+	return <span className={className}>{content}</span>;
 }
 
 export function StepsHistory({
@@ -56,7 +56,9 @@ export function StepsHistory({
 
 	// Always call ALL hooks first - never have early returns that skip hooks
 	const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-	const [manuallyExpandedItems, setManuallyExpandedItems] = useState<Set<string>>(new Set());
+	const [manuallyExpandedItems, setManuallyExpandedItems] = useState<
+		Set<string>
+	>(new Set());
 
 	// Create a unified timeline that combines completed steps and attempts
 	const createUnifiedTimeline = (): TimelineItem[] => {
@@ -72,15 +74,16 @@ export function StepsHistory({
 
 			// Find the correct attempt that corresponds to this completed step
 			const correctAttempt = allAttempts.find(
-				attempt => 
-					attempt.isCorrect && 
-					attempt.input === step && 
-					attempt.stepNumber === stepNumber
+				(attempt) =>
+					attempt.isCorrect &&
+					attempt.input === step &&
+					attempt.stepNumber === stepNumber,
 			);
 
 			timeline.push({
 				type: "completed_step",
-				timestamp: correctAttempt?.timestamp || new Date(Date.now() + index * 1000),
+				timestamp:
+					correctAttempt?.timestamp || new Date(Date.now() + index * 1000),
 				content: step,
 				stepNumber,
 				isCorrect: true,
@@ -122,9 +125,9 @@ export function StepsHistory({
 
 		timeline.forEach((item, index) => {
 			if (
-				item.type === "attempt" && 
-				item.status === "incorrect" && 
-				item.feedback && 
+				item.type === "attempt" &&
+				item.status === "incorrect" &&
+				item.feedback &&
 				item.feedback !== "Validating..."
 			) {
 				// Only auto-expand recent incorrect attempts (not completed step attempts)
@@ -135,7 +138,7 @@ export function StepsHistory({
 			}
 		});
 
-		setExpandedItems(prevExpanded => {
+		setExpandedItems((prevExpanded) => {
 			const newExpanded = new Set<string>();
 			let hasChanges = false;
 
@@ -149,11 +152,14 @@ export function StepsHistory({
 						const itemId = `timeline-item-${item.timestamp.getTime()}-${index}`;
 						return itemId === expandedItemId;
 					});
-					
+
 					if (timelineIndex !== -1) {
 						const item = timeline[timelineIndex];
 						// Only keep auto-expanded if it's a current step attempt
-						if (item.type === "attempt" && item.stepNumber >= currentStepNumber) {
+						if (
+							item.type === "attempt" &&
+							item.stepNumber >= currentStepNumber
+						) {
 							newExpanded.add(expandedItemId);
 						} else {
 							// This auto-expanded item should be collapsed now (previous step)
@@ -179,7 +185,7 @@ export function StepsHistory({
 	const toggleItemFeedback = (itemId: string) => {
 		const newExpanded = new Set(expandedItems);
 		const newManuallyExpanded = new Set(manuallyExpandedItems);
-		
+
 		if (newExpanded.has(itemId)) {
 			// Currently expanded, so collapse it
 			newExpanded.delete(itemId);
@@ -189,7 +195,7 @@ export function StepsHistory({
 			newExpanded.add(itemId);
 			newManuallyExpanded.add(itemId);
 		}
-		
+
 		setExpandedItems(newExpanded);
 		setManuallyExpandedItems(newManuallyExpanded);
 	};
@@ -205,7 +211,8 @@ export function StepsHistory({
 				const itemId = `timeline-item-${item.timestamp.getTime()}-${index}`;
 				const isExpanded = expandedItems.has(itemId);
 				const hasFeedback = item.feedback && item.feedback !== "Validating...";
-				const isValidating = item.status === "pending" || item.feedback === "Validating...";
+				const isValidating =
+					item.status === "pending" || item.feedback === "Validating...";
 
 				if (item.type === "completed_step") {
 					// Render completed step
@@ -213,9 +220,15 @@ export function StepsHistory({
 						? "bg-blue-50 p-4 rounded-lg border-2 border-blue-400 shadow-md"
 						: "bg-green-50 p-4 rounded-lg border border-green-200";
 
-					const iconColor = item.isFinalAnswer ? "text-blue-600" : "text-green-600";
-					const stepLabelColor = item.isFinalAnswer ? "text-blue-600" : "text-gray-500";
-					const stepLabel = item.isFinalAnswer ? "Final Answer" : `Step ${item.stepNumber}`;
+					const iconColor = item.isFinalAnswer
+						? "text-blue-600"
+						: "text-green-600";
+					const stepLabelColor = item.isFinalAnswer
+						? "text-blue-600"
+						: "text-gray-500";
+					const stepLabel = item.isFinalAnswer
+						? "Final Answer"
+						: `Step ${item.stepNumber}`;
 
 					return (
 						<div key={itemId} className="space-y-2">
@@ -258,7 +271,7 @@ export function StepsHistory({
 										<p className={`text-sm font-semibold ${stepLabelColor}`}>
 											{stepLabel}
 										</p>
-										<MathContent 
+										<MathContent
 											content={item.content}
 											className={`font-medium ${item.isFinalAnswer ? "text-blue-800 text-lg" : "text-gray-800"}`}
 										/>
@@ -281,7 +294,7 @@ export function StepsHistory({
 				let iconColor: string;
 				let label: string;
 				let ariaLabel: string;
-				
+
 				if (isValidating) {
 					bgColor = "bg-amber-50";
 					borderColor = "border-amber-200";
@@ -362,17 +375,17 @@ export function StepsHistory({
 									</svg>
 								)}
 								<div className="flex-1">
-									<p className={`text-sm font-medium ${textColor}`}>
-										{label}
-									</p>
-									<MathContent 
+									<p className={`text-sm font-medium ${textColor}`}>{label}</p>
+									<MathContent
 										content={item.content}
 										className="text-gray-800 mb-1"
 									/>
 
 									{/* Show loading state for validating attempts */}
 									{isValidating && (
-										<div className={`text-sm ${textColor} mt-2 p-2 ${bgColor} rounded border ${borderColor} flex items-center`}>
+										<div
+											className={`text-sm ${textColor} mt-2 p-2 ${bgColor} rounded border ${borderColor} flex items-center`}
+										>
 											<svg
 												className={`animate-spin -ml-1 mr-2 h-4 w-4 ${iconColor}`}
 												xmlns="http://www.w3.org/2000/svg"

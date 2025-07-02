@@ -12,7 +12,6 @@ import {
 import type { ValidationContext, ProblemModel, ValidationResult } from "../src/types";
 import { 
   getLLMFeedback, 
-  constructPrompt,
   type LLMFeedbackRequest 
 } from "./llm_service";
 
@@ -114,19 +113,19 @@ export const validateStep = action({
       };
 
       // Generate LLM feedback
-      const llmResponse = await getLLMFeedback(llmRequest);
+      const llmResponse = !validationResult.isCorrect ? await getLLMFeedback(llmRequest) : {feedback: "Correct!"};
 
       const processingTime = Date.now() - startTime;
 
              // Log attempt for analytics (simplified for demo)
        // In production, you'd call the internal mutation properly
-      //  console.log("Step attempt logged:", {
-      //    problemId: args.problemId,
-      //    studentInput: args.studentInput,
-      //    validationResult: validationResult.result,
-      //    isCorrect: validationResult.isCorrect,
-      //    processingTimeMs: processingTime,
-      //  });
+       console.log("Step attempt logged:", {
+         problemId: args.problemId,
+         studentInput: args.studentInput,
+         validationResult: validationResult.result,
+         isCorrect: validationResult.isCorrect,
+         processingTimeMs: processingTime,
+       });
 
       return {
         result: validationResult.result,

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { type LLMFeedbackRequest, constructPrompt } from "../../../convex/llm_service";
 import type { ProblemModel } from "../../types";
-import { constructPrompt } from "../llm-feedback-service";
-import type { LLMFeedbackRequest } from "../llm-feedback-service";
 
 describe("Hint System", () => {
 	const mockProblem: ProblemModel = {

@@ -262,6 +262,11 @@ export async function getLLMFeedback(
 
 	try {
 		const prompt = constructPrompt(request);
+		
+		// Log the full prompt for debugging
+		console.log("=== FULL LLM PROMPT ===");
+		console.log(prompt);
+		console.log("=== END PROMPT ===");
 
 		const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
 			method: "POST",
@@ -279,7 +284,7 @@ export async function getLLMFeedback(
 						content: prompt,
 					},
 				],
-				max_tokens: 300,
+				// max_tokens: 800, // Increased for Gemini 2.5 Pro
 				temperature: 0.7,
 			}),
 		});
@@ -290,12 +295,15 @@ export async function getLLMFeedback(
 		}
 
 		const data = await response.json();
+
+		console.log(data)
 		
 		if (!data.choices || !data.choices[0] || !data.choices[0].message) {
 			throw new Error("Invalid response format from OpenRouter API");
 		}
 
-		const feedback = data.choices[0].message.content.trim();
+		const message = data.choices[0].message;
+		let feedback = message.content?.trim() || "";
 
 		return {
 			feedback,

@@ -1,11 +1,8 @@
+import type { FeedbackEntry, FeedbackHistory } from "convex/llm_service";
 import { useAction } from "convex/react";
 import { useReducer } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import type {
-	FeedbackEntry,
-	FeedbackHistory,
-} from "../lib/llm-feedback-service";
 import type { ProblemModel, ValidationResult } from "../types";
 import { FeedbackDisplay } from "./FeedbackDisplay";
 import { ProblemView } from "./ProblemView";
