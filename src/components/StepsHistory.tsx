@@ -1,6 +1,6 @@
 import type { FeedbackHistory } from "convex/llm_service";
 import { useEffect, useState } from "react";
-import { LaTeXRenderer } from "./LaTeXRenderer";
+import { MathContent } from "./MathContent";
 import type { StudentAttempt } from "./MathTutorApp";
 
 interface StepsHistoryProps {
@@ -23,27 +23,7 @@ interface TimelineItem {
 }
 
 // Helper function to detect and render mathematical content
-function MathContent({
-	content,
-	className = "",
-}: { content: string; className?: string }) {
-	// Simple heuristic to detect if content might be LaTeX
-	const isLaTeX =
-		content.includes("\\") || content.includes("{") || content.includes("}");
-
-	if (isLaTeX) {
-		return (
-			<LaTeXRenderer
-				latex={content}
-				displayMode={false}
-				className={className}
-			/>
-		);
-	}
-
-	// Fallback to plain text for non-LaTeX content
-	return <span className={className}>{content}</span>;
-}
+// NOTE: This is replaced by the universal MathContent component imported above
 
 export function StepsHistory({
 	history,

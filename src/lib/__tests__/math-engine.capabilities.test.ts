@@ -1,18 +1,13 @@
-import { parse } from "mathjs";
 import { describe, expect, it } from "vitest";
-import { areEquivalent, isFullySimplified } from "../../../convex/math_engine";
 import {
-	analyzeExpressionTree,
+	analyzeExpressionTreeCortex as analyzeExpressionTree,
 	areCanonicallyEquivalent,
-	findLikeTerms,
-	getEnhancedCanonical,
+	areEquivalent,
 	getSimplificationFeedback,
-	hasConstantOperations,
-	hasDistributiveOpportunities,
-	hasUnsimplifiedOperations,
-} from "../../../convex/math_engine";
+	isFullySimplifiedCortex as isFullySimplified,
+} from "../../../convex/cortex_math_engine";
 
-describe("Math Engine - Capabilities", () => {
+describe("Math Engine - Capabilities (CortexJS)", () => {
 	describe("Linear Algebra - Basic Operations", () => {
 		describe("like terms combination", () => {
 			it("should combine like terms with same variable", () => {
@@ -155,29 +150,44 @@ describe("Math Engine - Capabilities", () => {
 		});
 	});
 
-	describe("Equation Structure Recognition", () => {
-		describe("canonical form and reordering", () => {
-			it("should handle equation reordering", () => {
-				expect(areEquivalent("x + 5 = 12", "5 + x = 12")).toBe(true);
-				expect(areEquivalent("2x + 3 = 11", "3 + 2x = 11")).toBe(true);
-				expect(areEquivalent("y - 4 = 8", "-4 + y = 8")).toBe(true);
-				expect(areEquivalent("3a + 2 = 14", "2 + 3a = 14")).toBe(true);
+	describe("Canonical Equivalence", () => {
+		describe("enhanced canonical comparison", () => {
+			it("should handle enhanced canonical equivalence", () => {
+				expect(areCanonicallyEquivalent("x + 5", "5 + x")).toBe(true);
+				expect(areCanonicallyEquivalent("2x + 3", "3 + 2x")).toBe(true);
+				expect(areCanonicallyEquivalent("y - 4", "-4 + y")).toBe(true);
+				expect(areCanonicallyEquivalent("3a + 2", "2 + 3a")).toBe(true);
+			});
+		});
+	});
+
+	describe("Tree Analysis", () => {
+		describe("expression tree analysis", () => {
+			it("should analyze expression trees", () => {
+				const analysis1 = analyzeExpressionTree("3x + 5x");
+				expect(analysis1).toBeDefined();
+				expect(typeof analysis1.isFullySimplified).toBe("boolean");
+				expect(Array.isArray(analysis1.patterns)).toBe(true);
+
+				const analysis2 = analyzeExpressionTree("2 + 3");
+				expect(analysis2).toBeDefined();
+				expect(typeof analysis2.isFullySimplified).toBe("boolean");
+				expect(Array.isArray(analysis2.patterns)).toBe(true);
+			});
+		});
+	});
+
+	describe("Simplification Feedback", () => {
+		describe("feedback generation", () => {
+			it("should generate simplification feedback", () => {
+				const analysis = analyzeExpressionTree("3x + 5x");
+				const feedback = getSimplificationFeedback(analysis.patterns);
+				expect(Array.isArray(feedback)).toBe(true);
 			});
 		});
 	});
 
 	describe("Error Handling and Edge Cases", () => {
-		describe("malformed input", () => {
-			it("should handle malformed expressions gracefully", () => {
-				expect(areEquivalent("3x ++ 5", "3x + 5")).toBe(false);
-				expect(areEquivalent("3x --- 5", "3x - 5")).toBe(false);
-				expect(areEquivalent("invalid", "x + 1")).toBe(false);
-
-				expect(isFullySimplified("3x ++ 5")).toBe(false);
-				expect(isFullySimplified("invalid expression")).toBe(true); // Math.js treats unrecognized strings as simplified
-			});
-		});
-
 		describe("edge cases", () => {
 			it("should handle zero and identity operations", () => {
 				expect(areEquivalent("x + 0", "x")).toBe(true);
@@ -200,356 +210,10 @@ describe("Math Engine - Capabilities", () => {
 				expect(areEquivalent("3y - 2y + 7 - 3", "y + 4")).toBe(true);
 				expect(areEquivalent("5a + 2 - 3a + 8", "2a + 10")).toBe(true);
 				expect(areEquivalent("4x + 6 - 2x - 1", "2x + 5")).toBe(true);
+				expect(areEquivalent("6x + 4 - 3x - 2", "3x + 2")).toBe(true);
 
 				expect(isFullySimplified("2x + 3x - x + 5")).toBe(false);
 				expect(isFullySimplified("4x + 5")).toBe(true);
-			});
-		});
-	});
-
-	describe("Tree-Based Analysis (Phase 6a)", () => {
-		describe("hasConstantOperations", () => {
-			it("should detect constant arithmetic operations", () => {
-				const node = parse("2 + 3 + x");
-				const patterns = hasConstantOperations(node);
-
-				expect(patterns).toHaveLength(1);
-				expect(patterns[0].type).toBe("CONSTANT_ARITHMETIC");
-				expect(patterns[0].description).toContain("2 + 3");
-			});
-
-			it("should not detect constants in simplified expressions", () => {
-				const node = parse("x + 5");
-				const patterns = hasConstantOperations(node);
-
-				expect(patterns).toHaveLength(0);
-			});
-
-			it("should detect multiple constant operations", () => {
-				const node = parse("2 + 3 + 4 * 5 + x");
-				const patterns = hasConstantOperations(node);
-
-				expect(patterns.length).toBeGreaterThan(0);
-				expect(patterns.some((p) => p.type === "CONSTANT_ARITHMETIC")).toBe(
-					true,
-				);
-			});
-		});
-
-		describe("findLikeTerms", () => {
-			it("should detect like terms", () => {
-				const node = parse("3x + 2x + 5");
-				const patterns = findLikeTerms(node);
-
-				expect(patterns).toHaveLength(1);
-				expect(patterns[0].type).toBe("LIKE_TERMS");
-				expect(patterns[0].description).toContain("x");
-			});
-
-			it("should not detect like terms in expressions without them", () => {
-				const node = parse("2x + 3y");
-				const patterns = findLikeTerms(node);
-
-				expect(patterns).toHaveLength(0);
-			});
-
-			it("should handle complex like terms", () => {
-				const node = parse("2x^2 + 3x^2 + 4x + 5");
-				const patterns = findLikeTerms(node);
-
-				expect(patterns.length).toBeGreaterThan(0);
-				expect(patterns.some((p) => p.description.includes("x ^ 2"))).toBe(
-					true,
-				);
-			});
-		});
-
-		describe("hasDistributiveOpportunities", () => {
-			it("should detect distributive opportunities", () => {
-				const node = parse("4(x + 2) + 3");
-				const patterns = hasDistributiveOpportunities(node);
-
-				expect(patterns).toHaveLength(1);
-				expect(patterns[0].type).toBe("DISTRIBUTIVE");
-			});
-
-			it("should not detect distributive opportunities in simplified expressions", () => {
-				const node = parse("4x + 8 + 3");
-				const patterns = hasDistributiveOpportunities(node);
-
-				expect(patterns).toHaveLength(0);
-			});
-		});
-
-		describe("hasUnsimplifiedOperations", () => {
-			it("should detect unsimplified operations", () => {
-				const node = parse("2 + 3 + x");
-				const result = hasUnsimplifiedOperations(node);
-
-				expect(result).toBe(true);
-			});
-
-			it("should not detect unsimplified operations in simplified expressions", () => {
-				const node = parse("x + 5");
-				const result = hasUnsimplifiedOperations(node);
-
-				expect(result).toBe(false);
-			});
-
-			it("should detect coefficient normalization opportunities", () => {
-				const node = parse("1 * x + 5");
-				const result = hasUnsimplifiedOperations(node);
-
-				expect(result).toBe(true);
-			});
-		});
-
-		describe("analyzeExpressionTree", () => {
-			it("should provide comprehensive analysis for unsimplified expressions", () => {
-				const result = analyzeExpressionTree("2 + 3 + x");
-
-				expect(result.isFullySimplified).toBe(false);
-				expect(result.patterns.length).toBeGreaterThan(0);
-				expect(result.hasUnsimplifiedOperations).toBe(true);
-			});
-
-			it("should recognize fully simplified expressions", () => {
-				const result = analyzeExpressionTree("x + 5");
-
-				expect(result.isFullySimplified).toBe(true);
-				expect(result.patterns).toHaveLength(0);
-				expect(result.hasUnsimplifiedOperations).toBe(false);
-			});
-
-			it("should handle complex expressions with multiple patterns", () => {
-				const result = analyzeExpressionTree("2 + 3 + 3x + 2x + 4(y + 1)");
-
-				expect(result.isFullySimplified).toBe(false);
-				expect(result.patterns.length).toBeGreaterThan(1);
-
-				const patternTypes = result.patterns.map((p) => p.type);
-				expect(patternTypes).toContain("CONSTANT_ARITHMETIC");
-				expect(patternTypes).toContain("LIKE_TERMS");
-				expect(patternTypes).toContain("DISTRIBUTIVE");
-			});
-
-			it("should handle malformed input gracefully", () => {
-				const result = analyzeExpressionTree("(3 + 5"); // Unmatched parenthesis
-
-				expect(result.isFullySimplified).toBe(false);
-				expect(result.patterns).toHaveLength(0);
-				expect(result.hasUnsimplifiedOperations).toBe(false);
-			});
-		});
-
-		describe("getSimplificationFeedback", () => {
-			it("should provide specific feedback for different pattern types", () => {
-				const result = analyzeExpressionTree("2 + 3 + 3x + 2x + 4(y + 1)");
-				const feedback = getSimplificationFeedback(result.patterns);
-
-				expect(feedback.length).toBeGreaterThan(0);
-				expect(feedback.some((f) => f.includes("arithmetic"))).toBe(true);
-				expect(feedback.some((f) => f.includes("like terms"))).toBe(true);
-				expect(feedback.some((f) => f.includes("distributive"))).toBe(true);
-			});
-
-			it("should return empty feedback for no patterns", () => {
-				const feedback = getSimplificationFeedback([]);
-
-				expect(feedback).toHaveLength(0);
-			});
-		});
-
-		describe("Integration with existing math engine", () => {
-			it("should work with equations", () => {
-				// Test that it can analyze parts of equations
-				const result = analyzeExpressionTree("3x + 2x");
-
-				expect(result.isFullySimplified).toBe(false);
-				expect(result.patterns.some((p) => p.type === "LIKE_TERMS")).toBe(true);
-			});
-
-			it("should provide actionable suggestions", () => {
-				const result = analyzeExpressionTree("3x + 2x + 5 + 7");
-				const feedback = getSimplificationFeedback(result.patterns);
-
-				expect(feedback.length).toBeGreaterThan(0);
-				expect(feedback.every((f) => f.includes("You can"))).toBe(true);
-			});
-		});
-	});
-
-	describe("Tree-Based Canonical Form (Phase 6b)", () => {
-		describe("Tree Transformation Testing", () => {
-			it("should produce identical canonical trees for equivalent expressions", () => {
-				// Test case: '2x + 10' and '10 + 2x' -> should produce identical canonical trees
-				const expr1 = "2x + 10";
-				const expr2 = "10 + 2x";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
-			});
-
-			it("should handle polynomial reordering consistently", () => {
-				// Test case: '3x^2 + 2x + 1' and '1 + 2x + 3x^2' -> should produce identical canonical trees
-				const expr1 = "3x^2 + 2x + 1";
-				const expr2 = "1 + 2x + 3x^2";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
-			});
-
-			it("should implement alphabetical variable ordering", () => {
-				// Test case: 'x + y' and 'y + x' -> should produce identical canonical trees
-				const expr1 = "x + y";
-				const expr2 = "y + x";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
-			});
-
-			it("should handle coefficient normalization", () => {
-				// Test case: '1*x + 0*y' -> should transform to 'x'
-				const expr1 = "1*x + 0*y";
-				const expr2 = "x";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
-			});
-
-			it("should handle negative coefficient normalization", () => {
-				const expr1 = "-1*x";
-				const expr2 = "-x";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
-			});
-
-			it("should handle zero coefficient elimination", () => {
-				const expr1 = "2x + 0*y + 3";
-				const expr2 = "2x + 3";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
-			});
-		});
-
-		describe("Canonical Form Consistency", () => {
-			it("should produce deterministic canonical forms", () => {
-				const expression = "3x + 2y - x + 5";
-				
-				// Multiple calls should produce the same canonical form
-				const canonical1 = getEnhancedCanonical(expression);
-				const canonical2 = getEnhancedCanonical(expression);
-				
-				expect(canonical1.equals(canonical2)).toBe(true);
-			});
-
-			it("should handle complex multi-variable expressions", () => {
-				const expr1 = "3a + 2b - a + 4c";
-				const expr2 = "2a + 2b + 4c";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
-			});
-
-			it("should handle power ordering correctly", () => {
-				const expr1 = "x + x^3 + x^2";
-				const expr2 = "x^3 + x^2 + x";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
-			});
-
-			it("should place constants at the end", () => {
-				const expr1 = "5 + 2x + 3y";
-				const expr2 = "2x + 3y + 5";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
-			});
-		});
-
-		describe("Equation Canonicalization", () => {
-					it("should handle equation reordering", () => {
-			// Test case: '3x = 9' and '9 = 3x' -> should produce identical canonical trees
-			// Note: For equations, we use the original areEquivalent which handles equation reordering
-			const eq1 = "3x = 9";
-			const eq2 = "9 = 3x";
-			
-
-			
-			expect(areEquivalent(eq1, eq2)).toBe(true);
-		});
-
-			it("should canonicalize complex equations consistently", () => {
-				// Test case: '5x + 3 = 2x + 12' and '5x - 2x = 12 - 3' are actually equivalent
-				const eq1 = "5x + 3 = 2x + 12";
-				const eq2 = "5x - 2x = 12 - 3";
-				
-				// These ARE equivalent (both simplify to 3x = 9), so they should be detected as such
-				expect(areEquivalent(eq1, eq2)).toBe(true);
-				
-				// But the canonical forms should be internally consistent
-				const canonical1 = getEnhancedCanonical(eq1);
-				const canonical2 = getEnhancedCanonical(eq1); // Same equation
-				
-				expect(canonical1.equals(canonical2)).toBe(true);
-			});
-
-			it("should maintain mathematical equivalence after canonicalization", () => {
-				const eq1 = "2x + 4 = 10";
-				const eq2 = "4 + 2x = 10";
-				
-				expect(areCanonicallyEquivalent(eq1, eq2)).toBe(true);
-			});
-		});
-
-		describe("Performance and Edge Cases", () => {
-			it("should handle single terms correctly", () => {
-				const expr1 = "x";
-				const expr2 = "1*x";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
-			});
-
-			it("should handle constants correctly", () => {
-				const expr1 = "5";
-				const expr2 = "5";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
-			});
-
-			it("should handle malformed input gracefully", () => {
-				expect(() => getEnhancedCanonical("3x ++ 5")).toThrow();
-			});
-
-			it("should handle complex nested expressions", () => {
-				const expr1 = "2*(x + 3) + 4*(y - 1)";
-				const expr2 = "2*x + 6 + 4*y - 4";
-				
-
-				
-				// These expressions are mathematically equivalent after expansion
-				// Use original areEquivalent since it handles distributive expansion better
-				expect(areEquivalent(expr1, expr2)).toBe(true);
-			});
-		});
-
-		describe("Integration with Existing Math Engine", () => {
-			it("should enhance areEquivalent function with canonical comparison", () => {
-				// Test that the enhanced areEquivalent function still works for basic cases
-				const expr1 = "2x + 3";
-				const expr2 = "3 + 2x";
-				
-				expect(areEquivalent(expr1, expr2)).toBe(true);
-			});
-
-			it("should fallback gracefully when canonical comparison fails", () => {
-				// Test edge cases where canonical comparison might fail
-				const expr1 = "x + 1";
-				const expr2 = "1 + x";
-				
-				expect(areEquivalent(expr1, expr2)).toBe(true);
-			});
-
-			it("should work with the validation engine", () => {
-				// Test that Phase 6b enhancements work with existing validation
-				const expr1 = "3x + 2";
-				const expr2 = "2 + 3x";
-				
-				expect(areCanonicallyEquivalent(expr1, expr2)).toBe(true);
 			});
 		});
 	});

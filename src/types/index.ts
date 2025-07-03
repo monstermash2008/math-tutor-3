@@ -4,7 +4,6 @@
  */
 
 import type { BoxedExpression } from "@cortex-js/compute-engine";
-import type { MathNode } from "mathjs";
 
 /**
  * Validation result codes that indicate the outcome of step validation
@@ -27,7 +26,7 @@ export interface SimplificationPattern {
 		| "DISTRIBUTIVE"
 		| "COEFFICIENT_NORMALIZATION";
 	description: string;
-	nodes: (MathNode | BoxedExpression)[];
+	nodes: BoxedExpression[];
 	suggestion: string;
 }
 

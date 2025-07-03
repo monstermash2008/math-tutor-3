@@ -6,7 +6,7 @@ This is an **interactive math tutor** built with React + TanStack Router fronten
 
 ### Tech Stack
 - **Frontend**: React 19, TanStack Router, Tailwind CSS, Vite
-- **Backend**: Convex (serverless), CortexJS + MathJS math engines  
+- **Backend**: Convex (serverless), CortexJS math engine
 - **AI**: OpenRouter API for dynamic feedback generation
 - **Testing**: Vitest + React Testing Library, 45% coverage threshold
 - **Package Manager**: pnpm (never use npm/yarn)
@@ -89,7 +89,7 @@ problems: defineTable({
 ### Core Math Engine
 - `convex/math_engine_bridge.ts` - Bridge between MathJS→CortexJS with fallbacks
 - `convex/validation_engine.ts` - Step validation logic with tree analysis
-- `convex/cortex_math_engine.ts` - CortexJS implementation (new)
+- `convex/cortex_math_engine.ts` - CortexJS implementation (primary)
 - `convex/math_engine.ts` - MathJS implementation (legacy)
 
 ### Frontend Components
@@ -147,3 +147,19 @@ Always modify through the bridge pattern:
 - **Gradual rollout** - use feature flags for safe deployment
 
 Remember: This is a sophisticated math education app with complex validation logic. Always test mathematical equivalence thoroughly and maintain the bridge pattern during engine migration.
+
+The app uses CortexJS exclusively for mathematical computation and expression parsing:
+
+```js
+// ✅ Good: Use CortexJS functions directly
+import { areEquivalent, isFullySimplified, analyzeExpressionTree } from "./cortex_math_engine";
+
+return areEquivalent(expr1, expr2);
+```
+
+- `convex/cortex_math_engine.ts` - CortexJS implementation (primary)
+- `convex/validation_engine.ts` - Step validation logic
+- `convex/validation.ts` - Convex validation functions
+
+- **Test thoroughly** - CortexJS has different behavior than MathJS
+- **Use proper imports** - import from `cortex_math_engine.ts`

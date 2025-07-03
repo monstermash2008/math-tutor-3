@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
+import { MathContent } from "./MathContent";
 
 interface ProblemFormData {
 	problemStatement: string;
@@ -566,10 +567,13 @@ export default function ProblemCreator({
 
 								<div>
 									<h4 className="font-medium mb-2">Problem Statement:</h4>
-									<p className="bg-gray-50 p-3 rounded border">
-										{formData.problemStatement ||
-											"No problem statement entered"}
-									</p>
+									<div className="bg-gray-50 p-3 rounded border">
+										{formData.problemStatement ? (
+											<MathContent content={formData.problemStatement} />
+										) : (
+											<span className="text-gray-500">No problem statement entered</span>
+										)}
+									</div>
 								</div>
 
 								<div>

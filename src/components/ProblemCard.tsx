@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ProblemModel } from "../types";
+import { MathContent } from "./MathContent";
 
 interface ProblemCardProps {
 	problem: ProblemModel;
@@ -48,10 +49,12 @@ export function ProblemCard({ problem }: ProblemCardProps) {
 				{/* Problem statement */}
 				<div className="mb-4">
 					<h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-						{problem.title || problem.problemStatement}
+						{problem.title || <MathContent content={problem.problemStatement} />}
 					</h3>
 					{problem.title && (
-						<p className="text-sm text-gray-600">{problem.problemStatement}</p>
+						<div className="text-lg text-gray-600">
+							<MathContent content={problem.problemStatement} />
+						</div>
 					)}
 				</div>
 

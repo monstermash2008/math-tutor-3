@@ -1,15 +1,3 @@
-// import {
-// 	analyzeExpressionTree,
-// 	areEquivalent,
-// 	getCanonical,
-// 	getSimplificationFeedback,
-// 	isFullySimplified,
-// 	validateMathInputSyntax,
-// 	// Phase 6b: Import new enhanced canonical functions
-// 	getEnhancedCanonical,
-// 	areCanonicallyEquivalent,
-// } from "./math_engine";
-
 import type {
 	ValidationResult,
 	StepValidationResult,
@@ -18,7 +6,17 @@ import type {
 	TreeAnalysisResult,
 } from "../src/types";
 import { MathParsingError } from "../src/types";
-import { analyzeExpressionTree, areCanonicallyEquivalent, areEquivalent, getSimplificationFeedback, isFullySimplified, validateMathInputSyntax } from "./math_engine_bridge";
+import { 
+	analyzeExpressionTreeCortex as analyzeExpressionTree,
+	areEquivalent,
+	areCanonicallyEquivalent,
+	isFullySimplifiedCortex as isFullySimplified,
+	validateMathInputSyntax,
+	getSimplificationFeedback,
+	parseTextExpression,
+	parseLatexExpression,
+	getComputeEngine,
+} from "./cortex_math_engine";
 
 /**
  * Main validation function that checks a student's step against the problem model

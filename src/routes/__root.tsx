@@ -32,12 +32,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				title: "TanStack Start Starter",
 			},
 		],
-		links: [
-			{
-				rel: "stylesheet",
-				href: appCss,
-			},
-		],
 	}),
 
 	component: () => (
